@@ -1,0 +1,26 @@
+### Test login admin
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@gmail.com",
+  "motDePasse": "admin123"
+}
+
+### Test mauvais email
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "wrong@gmail.com",
+  "motDePasse": "admin123"
+}
+
+### Test mauvais mot de passe
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@gmail.com",
+  "motDePasse": "wrongpass"
+}
