@@ -1,5 +1,5 @@
+import { TriangleAlert } from "lucide-react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
 import AnomalyCard from "../../components/cards/AnomalyCard";
@@ -11,7 +11,7 @@ export default function AdminAnomaliesPage() {
 
   if (loading) {
     return (
-      <DashboardLayout title="Admin Anomalies" subtitle="Loading..." roleLabel="Administrator">
+      <DashboardLayout title="Anomalies" subtitle="Loading..." roleLabel="Administrator">
         <Loader />
       </DashboardLayout>
     );
@@ -19,26 +19,45 @@ export default function AdminAnomaliesPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="Admin Anomalies" subtitle="Unable to load" roleLabel="Administrator">
+      <DashboardLayout title="Anomalies" subtitle="Unable to load" roleLabel="Administrator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
   }
 
   const anomalies = items ?? [];
+  const critCount = anomalies.filter(a => a.gravite === "CRITIQUE").length;
 
   return (
     <DashboardLayout
-      title="Admin Anomalies"
+      title="Anomalies"
       subtitle="Review deviations detected by the analysis pipeline with severity context."
       roleLabel="Administrator"
     >
-      <Card className="info-card">
-        <div className="card-title-row">
+      <div className="v2-kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <div className="v2-kpi">
+          <span className="ic t-warn"><TriangleAlert size={18} strokeWidth={2.2} /></span>
+          <div className="label">Total anomalies</div>
+          <div className="value">{anomalies.length}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-crit"><TriangleAlert size={18} strokeWidth={2.2} /></span>
+          <div className="label">Critical</div>
+          <div className="value">{critCount}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-ok"><TriangleAlert size={18} strokeWidth={2.2} /></span>
+          <div className="label">Normal</div>
+          <div className="value">{anomalies.length - critCount}</div>
+        </div>
+      </div>
+
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head" style={{ alignItems: "center" }}>
           <h3>Anomaly register</h3>
         </div>
 
-        <div className="list-stack">
+        <div className="v2-rows">
           {anomalies.length ? (
             anomalies.map((anomaly) => (
               <AnomalyCard
@@ -54,10 +73,10 @@ export default function AdminAnomaliesPage() {
               />
             ))
           ) : (
-            <div className="centered-empty">No anomalies available.</div>
+            <div className="v2-empty">No anomalies available.</div>
           )}
         </div>
-      </Card>
+      </div>
     </DashboardLayout>
   );
 }

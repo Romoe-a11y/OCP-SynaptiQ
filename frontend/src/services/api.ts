@@ -10,6 +10,14 @@ const api = axios.create({
 
 // Request interceptor: attach JWT
 api.interceptors.request.use((config) => {
+  const url = config.url ?? "";
+  if (url.includes("/auth/login") || url.includes("/auth/refresh")) {
+    if (config.headers) {
+      delete config.headers.Authorization;
+    }
+    return config;
+  }
+
   const token = localStorage.getItem("token");
   if (token) {
     config.headers = config.headers ?? {};

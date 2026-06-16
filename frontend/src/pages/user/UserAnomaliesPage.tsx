@@ -1,5 +1,4 @@
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
 import AnomalyCard from "../../components/cards/AnomalyCard";
@@ -11,7 +10,7 @@ export default function UserAnomaliesPage() {
 
   if (loading) {
     return (
-      <DashboardLayout title="User Anomalies" subtitle="Loading..." roleLabel="Operator">
+      <DashboardLayout title="Anomalies" subtitle="Loading..." roleLabel="Operator">
         <Loader />
       </DashboardLayout>
     );
@@ -19,7 +18,7 @@ export default function UserAnomaliesPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="User Anomalies" subtitle="Unable to load" roleLabel="Operator">
+      <DashboardLayout title="Anomalies" subtitle="Unable to load" roleLabel="Operator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
@@ -28,13 +27,32 @@ export default function UserAnomaliesPage() {
   const anomalies = items ?? [];
 
   return (
-    <DashboardLayout title="User Anomalies" subtitle="Readable anomaly summaries for day-to-day operational consultation." roleLabel="Operator">
-      <Card className="info-card">
-        <div className="card-title-row"><h3>Detected anomalies</h3></div>
-        <div className="list-stack">
-          {anomalies.length ? anomalies.map((anomaly) => <AnomalyCard key={anomaly.id} anomaly={{ id: anomaly.id, type: anomaly.type, description: anomaly.description, gravite: anomaly.gravite ?? "INFO", score: anomaly.score ?? 0, dateDetection: anomaly.dateDetection ?? "" }} />) : <div className="centered-empty">No anomalies available.</div>}
+    <DashboardLayout title="Anomalies" subtitle="Readable anomaly summaries for day-to-day operational consultation." roleLabel="Operator">
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head" style={{ alignItems: "center" }}>
+          <h3>Detected anomalies</h3>
+          <span className="v2-badge neutral">{anomalies.length} records</span>
         </div>
-      </Card>
+        <div className="v2-rows">
+          {anomalies.length ? (
+            anomalies.map((anomaly) => (
+              <AnomalyCard
+                key={anomaly.id}
+                anomaly={{
+                  id: anomaly.id,
+                  type: anomaly.type,
+                  description: anomaly.description,
+                  gravite: anomaly.gravite ?? "INFO",
+                  score: anomaly.score ?? 0,
+                  dateDetection: anomaly.dateDetection ?? "",
+                }}
+              />
+            ))
+          ) : (
+            <div className="v2-empty">No anomalies available.</div>
+          )}
+        </div>
+      </div>
     </DashboardLayout>
   );
 }

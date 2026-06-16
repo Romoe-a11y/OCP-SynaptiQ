@@ -37,8 +37,7 @@ export async function uploadProfilePicture(file: File): Promise<{ profilePicture
   formData.append("file", file);
   const response = await api.post<{ profilePictureUrl: string; message: string }>(
     "/api/auth/profile-picture",
-    formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
+    formData
   );
   return response.data;
 }

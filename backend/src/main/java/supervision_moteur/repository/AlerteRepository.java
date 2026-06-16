@@ -12,6 +12,7 @@ import supervision_moteur.enums.StatutAlerte;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface AlerteRepository extends JpaRepository<Alerte, Long> {
 
@@ -26,6 +27,7 @@ public interface AlerteRepository extends JpaRepository<Alerte, Long> {
     List<Alerte> findTop20ByOrderByDateCreationDesc();
     List<Alerte> findByStatutInOrderByDateCreationDesc(Collection<StatutAlerte> statuts);
     List<Alerte> findTop50ByOrderByDateCreationDesc();
+    Optional<Alerte> findByAnomalieId(Long anomalieId);
 
     // ── SLA / escalation ──
     List<Alerte> findBySlaDeadlineBeforeAndStatutIn(LocalDateTime deadline, Collection<StatutAlerte> statuts);

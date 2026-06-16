@@ -53,8 +53,17 @@ public class AlertService {
         if (prediction.getNiveauRisque() == GraviteType.FAIBLE) {
             return null;
         }
+        Anomalie anomalie = createOrResolveAnomaly(prediction);
+        if (anomalie != null && anomalie.getId() != null) {
+            Alerte existing = alerteRepository.findByAnomalieId(anomalie.getId()).orElse(null);
+            if (existing != null) {
+                return existing;
+            }
+        }
+
         AlertCreateRequest request = new AlertCreateRequest();
         request.setMachineId(prediction.getMachine() != null ? prediction.getMachine().getId() : null);
+        request.setAnomalieId(anomalie != null ? anomalie.getId() : null);
         request.setSeverity(prediction.getNiveauRisque());
         request.setMessage(buildPredictionMessage(prediction));
         request.setNotificationChannel("dashboard");
@@ -128,6 +137,33 @@ public class AlertService {
         }
         return anomalieRepository.findById(anomalieId)
                 .orElseThrow(() -> new IllegalArgumentException("Anomaly not found: " + anomalieId));
+    }
+
+    private Anomalie createOrResolveAnomaly(Prediction prediction) {
+        if (prediction == null || prediction.getMesure() == null || prediction.getMesure().getId() == null) {
+            return null;
+        }
+
+        return anomalieRepository.findByMesureId(prediction.getMesure().getId())
+                .orElseGet(() -> {
+                    Anomalie anomalie = new Anomalie();
+                    anomalie.setMesure(prediction.getMesure());
+                    anomalie.setType(prediction.getOutputLabel() != null ? prediction.getOutputLabel() : "PREDICTION_RISK");
+                    anomalie.setDescription(buildPredictionMessage(prediction));
+                    anomalie.setGravite(prediction.getNiveauRisque());
+                    anomalie.setScore(prediction.getAnomalyScore() != null
+                            ? prediction.getAnomalyScore()
+                            : normalizedScore(prediction.getProbability()));
+                    anomalie.setDateDetection(LocalDateTime.now());
+                    return anomalieRepository.save(anomalie);
+                });
+    }
+
+    private Double normalizedScore(Double probability) {
+        if (probability == null) {
+            return null;
+        }
+        return probability <= 1.0 ? probability * 100.0 : probability;
     }
 
     private LocalDateTime defaultSla(GraviteType gravite) {

@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
 import {
-  Thermometer,
-  Zap,
   Activity,
+  Cpu,
   Gauge,
   Search,
-  Cpu,
+  Thermometer,
+  Zap,
 } from "lucide-react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import { useApi } from "../../hooks/useApi";
 import { getMesures } from "../../services/dashboardService";
@@ -30,17 +29,13 @@ function formatDate(value?: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleString("en-GB", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+    : date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function getStatusClass(status?: string) {
-  if (status === "NORMAL") return "status-normal";
-  if (status === "ALERTE") return "status-alert";
-  if (status === "CRITIQUE") return "status-critical";
-  return "";
+function statusBadge(status?: string) {
+  if (status === "CRITIQUE") return "v2-badge crit";
+  if (status === "ALERTE") return "v2-badge warn";
+  return "v2-badge ok";
 }
 
 function buildLatestStates(items: MesureApi[]): LatestMotorState[] {
@@ -50,16 +45,12 @@ function buildLatestStates(items: MesureApi[]): LatestMotorState[] {
     const machineName = item.machine?.nom?.trim() || "Unnamed motor";
     const machineKey = machineName.toLowerCase();
     const currentDate = item.horodatage ? new Date(item.horodatage).getTime() : 0;
-
     const existing = latestByMachineName.get(machineKey);
-    const existingDate = existing?.horodatage
-      ? new Date(existing.horodatage).getTime()
-      : 0;
+    const existingDate = existing?.horodatage ? new Date(existing.horodatage).getTime() : 0;
 
     if (!existing || currentDate > existingDate) {
       latestByMachineName.set(machineKey, {
-        machineId:
-          item.machine?.id != null ? String(item.machine.id) : machineKey,
+        machineId: item.machine?.id != null ? String(item.machine.id) : machineKey,
         machineName,
         horodatage: item.horodatage,
         temperature: item.temperature,
@@ -85,119 +76,82 @@ export default function UserMotorsPage() {
   const filteredMotors = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return latestStates;
-
-    return latestStates.filter((motor) =>
-      motor.machineName.toLowerCase().includes(query)
-    );
+    return latestStates.filter((motor) => motor.machineName.toLowerCase().includes(query));
   }, [latestStates, search]);
 
-  return (
-      <DashboardLayout
-        title="Motors"
-        subtitle="Search and consult the latest motor state."
-        roleLabel="Operator"
-      >
-      {loading ? (
+  if (loading) {
+    return (
+      <DashboardLayout title="Motors" subtitle="Loading..." roleLabel="Operator">
         <Loader />
-      ) : (
-        <div className="stack">
-          <Card className="info-card">
-            <div className="card-title-row">
-              <h3>Motor search</h3>
-            </div>
+      </DashboardLayout>
+    );
+  }
 
-            <div className="motors-search-bar enhanced-search-bar">
-              <div className="search-icon-wrap">
-                <Search size={18} strokeWidth={2.2} />
-              </div>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search a motor by name..."
-                className="motors-search-input enhanced-search-input"
-              />
-            </div>
-
-            <p className="motors-search-helper">
-              {filteredMotors.length} motor{filteredMotors.length > 1 ? "s" : ""} found
-            </p>
-          </Card>
-
-          <div className="motors-grid">
-            {filteredMotors.length ? (
-              filteredMotors.map((motor) => (
-                <Card className="motor-state-card enhanced-motor-card" key={motor.machineId}>
-                  <div className="motor-state-header">
-                    <div className="motor-title-wrap">
-                      <div className="motor-main-icon">
-                        <Cpu size={20} strokeWidth={2.2} />
-                      </div>
-
-                      <div>
-                        <h3 className="motor-state-title">{motor.machineName}</h3>
-                        <p className="motor-state-date">
-                          Last update: {formatDate(motor.horodatage)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className={`data-badge ${getStatusClass(motor.statut)}`}>
-                      {motor.statut ?? "--"}
-                    </span>
-                  </div>
-
-                  <div className="motor-state-grid">
-                    <div className="motor-state-item temperature-card">
-                      <div className="metric-icon">
-                        <Thermometer size={20} strokeWidth={2.2} />
-                      </div>
-                      <div className="metric-content">
-                        <span>Temperature</span>
-                        <strong>{motor.temperature ?? "--"} °C</strong>
-                      </div>
-                    </div>
-
-                    <div className="motor-state-item current-card">
-                      <div className="metric-icon">
-                        <Zap size={20} strokeWidth={2.2} />
-                      </div>
-                      <div className="metric-content">
-                        <span>Current</span>
-                        <strong>{motor.courant ?? "--"} A</strong>
-                      </div>
-                    </div>
-
-                    <div className="motor-state-item vibration-card">
-                      <div className="metric-icon">
-                        <Activity size={20} strokeWidth={2.2} />
-                      </div>
-                      <div className="metric-content">
-                        <span>Vibration</span>
-                        <strong>{motor.vibration ?? "--"}</strong>
-                      </div>
-                    </div>
-
-                    <div className="motor-state-item rpm-card">
-                      <div className="metric-icon">
-                        <Gauge size={20} strokeWidth={2.2} />
-                      </div>
-                      <div className="metric-content">
-                        <span>RPM</span>
-                        <strong>{motor.rpm ?? "--"}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <Card className="info-card">
-                <div className="centered-empty">No motor found.</div>
-              </Card>
-            )}
-          </div>
+  return (
+    <DashboardLayout
+      title="Motors"
+      subtitle="Search and consult the latest motor state."
+      roleLabel="Operator"
+    >
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head"><h3>Motor search</h3></div>
+        <div style={{ position: "relative", marginTop: 8 }}>
+          <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }} />
+          <input
+            type="text"
+            className="v2-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search a motor by name..."
+            style={{ paddingLeft: 36 }}
+          />
         </div>
-      )}
+        <p style={{ fontSize: ".82rem", color: "var(--muted)", marginTop: 8 }}>
+          {filteredMotors.length} motor{filteredMotors.length !== 1 ? "s" : ""} found
+        </p>
+      </div>
+
+      <div className="user-motors-grid">
+        {filteredMotors.length ? (
+          filteredMotors.map((motor) => (
+            <div className="v2-card v2-card-pad user-motor-card" key={motor.machineId}>
+              <div className="user-motor-head">
+                <div className="user-motor-title-row">
+                  <span className="ic t-green"><Cpu size={20} strokeWidth={2.2} /></span>
+                  <div className="user-motor-title-copy">
+                    <strong>{motor.machineName}</strong>
+                    <div>Last update: {formatDate(motor.horodatage)}</div>
+                  </div>
+                </div>
+                <span className={statusBadge(motor.statut)}>{motor.statut ?? "--"}</span>
+              </div>
+
+              <div className="v2-signals">
+                <div className="v2-signal">
+                  <div className="st"><span className="si t-temp"><Thermometer size={16} strokeWidth={2.2} /></span><span className="sl">Temp</span></div>
+                  <div className="sv">{motor.temperature ?? "--"}<small>&deg;C</small></div>
+                </div>
+                <div className="v2-signal">
+                  <div className="st"><span className="si t-cur"><Zap size={16} strokeWidth={2.2} /></span><span className="sl">Current</span></div>
+                  <div className="sv">{motor.courant ?? "--"}<small>A</small></div>
+                </div>
+                <div className="v2-signal">
+                  <div className="st"><span className="si t-vib"><Activity size={16} strokeWidth={2.2} /></span><span className="sl">Vibration</span></div>
+                  <div className="sv">{motor.vibration ?? "--"}</div>
+                </div>
+                <div className="v2-signal">
+                  <div className="st"><span className="si t-ok"><Gauge size={16} strokeWidth={2.2} /></span><span className="sl">RPM</span></div>
+                  <div className="sv">{motor.rpm ?? "--"}</div>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="v2-card v2-card-pad">
+            <div className="v2-empty">No motor found.</div>
+          </div>
+        )}
+      </div>
     </DashboardLayout>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AtSign,
-  BellRing,
+  Bell,
   Camera,
   IdCard,
   KeyRound,
@@ -13,8 +13,6 @@ import {
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
-import Button from "../../components/common/Button";
 import Loader from "../../components/common/Loader";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -29,8 +27,8 @@ import type { LoginResponse, ProfileDetails } from "../../types";
 function getErrorMessage(err: unknown) {
   const data = (err as any)?.response?.data;
   if (typeof data === "string") return data;
-  if (typeof data?.error === "string") return data.error;
   if (typeof data?.message === "string") return data.message;
+  if (typeof data?.error === "string") return data.error;
   if (typeof (err as any)?.message === "string") return (err as any).message;
   return "Unable to save changes";
 }
@@ -39,16 +37,26 @@ function formatDate(value?: string | null) {
   if (!value) return "Not recorded";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not recorded";
-  return date.toLocaleString("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function splitName(full: string): [string, string] {
   const parts = full.trim().split(/\s+/);
   if (parts.length <= 1) return [parts[0] || "", ""];
   return [parts[0], parts.slice(1).join(" ")];
+}
+
+const MAX_PROFILE_IMAGE_BYTES = 10 * 1024 * 1024;
+const SUPPORTED_PROFILE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/bmp",
+]);
+
+function isSupportedProfileImage(file: File) {
+  if (SUPPORTED_PROFILE_IMAGE_TYPES.has(file.type)) return true;
+  return /\.(jpe?g|png|gif|bmp)$/i.test(file.name);
 }
 
 function profileToUser(profile: ProfileDetails, fallback: LoginResponse | null): LoginResponse {
@@ -118,9 +126,7 @@ export default function AdminSettingsPage() {
     }
 
     loadProfile();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [user]);
 
   const fullName = useMemo(() => {
@@ -201,6 +207,19 @@ export default function AdminSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setPictureError("");
+
+    if (!isSupportedProfileImage(file)) {
+      setPictureError("Use a JPG, PNG, GIF, or BMP image.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      setPictureError("Profile picture must be 10 MB or smaller.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setUploadingPicture(true);
 
     try {
@@ -243,291 +262,200 @@ export default function AdminSettingsPage() {
       subtitle="Edit your account identity, security and notification preferences."
       roleLabel="Administrator"
     >
-      <div className="stack profile-settings-page">
-        <div className="profile-editor-grid">
-          <Card className="info-card profile-summary-card">
-            <div className="profile-picture-section">
-              {profile?.profilePictureUrl ? (
-                <img
-                  src={profile.profilePictureUrl}
-                  alt="Profile"
-                  className="profile-avatar-image"
-                />
-              ) : (
-                <div className="profile-avatar-large">{initials}</div>
-              )}
+      {/* ── KPI strip ── */}
+      <div className="profile-settings-page">
+      <div className="v2-kpi-grid profile-kpi-grid">
+        <div className="v2-kpi">
+          <span className="ic t-green"><UserRound size={18} strokeWidth={2.2} /></span>
+          <div className="label">Display name</div>
+          <div className="value" style={{ fontSize: "1rem" }}>{fullName}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-ok"><ShieldCheck size={18} strokeWidth={2.2} /></span>
+          <div className="label">Role</div>
+          <div className="value" style={{ fontSize: "1rem" }}>{roleLabel}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-purple"><Mail size={18} strokeWidth={2.2} /></span>
+          <div className="label">Email alerts</div>
+          <div className="value" style={{ fontSize: "1rem" }}>{notificationEmail ? "Enabled" : "Disabled"}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-cur"><LockKeyhole size={18} strokeWidth={2.2} /></span>
+          <div className="label">Login count</div>
+          <div className="value">{profile?.loginCount ?? 0}</div>
+        </div>
+      </div>
 
-              <div className="profile-picture-actions">
-                <button
-                  className="profile-picture-btn"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingPicture}
-                  title="Upload picture"
-                >
-                  <Camera size={15} strokeWidth={2.2} />
-                  <span>{uploadingPicture ? "Uploading..." : "Upload"}</span>
-                </button>
+      {/* ── Profile + Account grid ── */}
+      <div className="profile-editor-grid">
+        {/* Left: Avatar summary */}
+        <div className="v2-card profile-summary-card">
+          <div className="v2-card-head"><h3>Profile summary</h3></div>
 
-                {profile?.profilePictureUrl && (
-                  <button
-                    className="profile-picture-btn danger"
-                    onClick={handlePictureRemove}
-                    disabled={uploadingPicture}
-                    title="Remove picture"
-                  >
-                    <Trash2 size={15} strokeWidth={2.2} />
-                  </button>
-                )}
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePictureUpload}
-                style={{ display: "none" }}
+          <div className="profile-picture-section">
+            {profile?.profilePictureUrl ? (
+              <img
+                src={profile.profilePictureUrl}
+                alt="Profile"
+                className="profile-avatar-image"
               />
+            ) : (
+              <div className="profile-avatar-large">
+                {initials}
+              </div>
+            )}
 
-              {pictureError && <div className="error-box compact">{pictureError}</div>}
+            <div className="profile-picture-actions">
+              <button
+                type="button"
+                className="profile-picture-btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPicture}
+              >
+                <Camera size={15} />
+                {uploadingPicture ? "Uploading..." : "Upload"}
+              </button>
+              {profile?.profilePictureUrl && (
+                <button
+                  type="button"
+                  className="profile-picture-btn danger"
+                  onClick={handlePictureRemove}
+                  disabled={uploadingPicture}
+                  aria-label="Remove profile picture"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
             </div>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/bmp,.jpg,.jpeg,.png,.gif,.bmp" onChange={handlePictureUpload} style={{ display: "none" }} />
+            {pictureError && <div className="v2-note warning">{pictureError}</div>}
+          </div>
 
-            <div>
-              <div className="section-badge">Current profile</div>
-              <h3>{fullName}</h3>
-              <p>{email || "No email configured"}</p>
+          <div className="profile-meta-list">
+            <div className="profile-meta-row">
+              <IdCard size={14} />
+              <span>Account ID</span>
+              <strong>#{profile?.id ?? user?.id ?? "--"}</strong>
             </div>
-
-            <div className="profile-meta-list">
-              <div className="profile-meta-row">
-                <IdCard size={17} strokeWidth={2.2} />
-                <span>Account ID</span>
-                <strong>#{profile?.id ?? user?.id ?? "--"}</strong>
-              </div>
-              <div className="profile-meta-row">
-                <ShieldCheck size={17} strokeWidth={2.2} />
-                <span>Role</span>
-                <strong>{roleLabel}</strong>
-              </div>
-              <div className="profile-meta-row">
-                <LockKeyhole size={17} strokeWidth={2.2} />
-                <span>Status</span>
-                <strong>{profile?.accountLocked ? "Locked" : "Active"}</strong>
-              </div>
-              <div className="profile-meta-row">
-                <AtSign size={17} strokeWidth={2.2} />
-                <span>Last login</span>
-                <strong>{formatDate(profile?.lastLoginAt)}</strong>
-              </div>
+            <div className="profile-meta-row">
+              <ShieldCheck size={14} />
+              <span>Role</span>
+              <strong>{roleLabel}</strong>
             </div>
-          </Card>
-
-          <Card className="info-card profile-form-card">
-            <div className="profile-section-heading">
-              <div className="settings-panel-icon settings-tone">
-                <UserRound size={18} strokeWidth={2.2} />
-              </div>
-              <div>
-                <h3>Account details</h3>
-                <p>Update the name shown across the platform.</p>
-              </div>
+            <div className="profile-meta-row">
+              <LockKeyhole size={14} />
+              <span>Status</span>
+              <strong>{profile?.accountLocked ? "Locked" : "Active"}</strong>
             </div>
-
-            <form onSubmit={handleProfileSubmit} className="profile-form">
-              <div className="profile-form-grid">
-                <div className="form-group">
-                  <label htmlFor="profile-first-name">First name</label>
-                  <input
-                    id="profile-first-name"
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    minLength={1}
-                    maxLength={50}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="profile-last-name">Last name</label>
-                  <input
-                    id="profile-last-name"
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    maxLength={50}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="profile-email">Email address</label>
-                <input
-                  id="profile-email"
-                  type="email"
-                  value={email}
-                  readOnly
-                  disabled
-                  className="input-readonly"
-                />
-                <small className="form-hint">Email cannot be changed. Contact an administrator.</small>
-              </div>
-
-              <div className="profile-section-heading profile-subsection-heading">
-                <div className="settings-panel-icon report-tone">
-                  <BellRing size={18} strokeWidth={2.2} />
-                </div>
-                <div>
-                  <h3>Notifications</h3>
-                  <p>Control direct notification delivery for your account.</p>
-                </div>
-              </div>
-
-              <label className="profile-toggle-row" htmlFor="notification-email">
-                <span>
-                  <strong>Email notifications</strong>
-                  <small>Receive account and operational notifications by email.</small>
-                </span>
-                <input
-                  id="notification-email"
-                  type="checkbox"
-                  checked={notificationEmail}
-                  onChange={(e) => setNotificationEmail(e.target.checked)}
-                />
-              </label>
-
-              <div className="form-group">
-                <label htmlFor="notification-webhook">Webhook URL</label>
-                <input
-                  id="notification-webhook"
-                  type="url"
-                  value={notificationWebhook}
-                  onChange={(e) => setNotificationWebhook(e.target.value)}
-                  maxLength={500}
-                  placeholder="https://example.com/alerts"
-                />
-                <small className="form-hint">
-                  Receive real-time JSON payloads on motor alerts and status changes.
-                </small>
-              </div>
-
-              <div className="profile-action-row">
-                <Button type="submit" disabled={savingProfile}>
-                  <Save size={17} strokeWidth={2.2} />
-                  {savingProfile ? "Saving..." : "Save profile"}
-                </Button>
-              </div>
-
-              {profileError ? <div className="error-box">{profileError}</div> : null}
-              {profileSuccess ? <div className="success-box">{profileSuccess}</div> : null}
-            </form>
-          </Card>
+            <div className="profile-meta-row">
+              <AtSign size={14} />
+              <span>Last login</span>
+              <strong>{formatDate(profile?.lastLoginAt)}</strong>
+            </div>
+          </div>
         </div>
 
-        <Card className="info-card profile-security-card">
+        {/* Right: Account details form */}
+        <div className="v2-card profile-form-card">
           <div className="profile-section-heading">
-            <div className="settings-panel-icon monitor-tone">
-              <KeyRound size={18} strokeWidth={2.2} />
-            </div>
+            <span className="profile-section-icon t-green"><UserRound size={19} /></span>
             <div>
-              <h3>Password and security</h3>
-              <p>Change the password used to sign into this account.</p>
+              <h3>Account details</h3>
+              <p>Update the name shown across the platform.</p>
             </div>
           </div>
 
-          <form onSubmit={handlePasswordSubmit} className="profile-form">
-            <div className="profile-form-grid profile-password-grid">
-              <div className="form-group">
-                <label htmlFor="current-password">Current password</label>
-                <input
-                  id="current-password"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
+          <form className="profile-form" onSubmit={handleProfileSubmit}>
+            <div className="profile-form-grid">
+              <div className="v2-field">
+                <label>First name</label>
+                <input className="v2-input" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required minLength={1} maxLength={50} />
               </div>
+              <div className="v2-field">
+                <label>Last name</label>
+                <input className="v2-input" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={50} />
+              </div>
+            </div>
 
-              <div className="form-group">
-                <label htmlFor="new-password">New password</label>
-                <input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  minLength={8}
-                  autoComplete="new-password"
-                  required
-                />
-              </div>
+            <div className="v2-field">
+              <label>Email address</label>
+              <input className="v2-input input-readonly" type="email" value={email} readOnly disabled />
+              <small className="form-hint">Email cannot be changed. Contact an administrator.</small>
+            </div>
 
-              <div className="form-group">
-                <label htmlFor="confirm-password">Confirm new password</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  minLength={8}
-                  autoComplete="new-password"
-                  required
-                />
+            <div className="profile-section-heading profile-subsection-heading">
+              <span className="profile-section-icon t-warn"><Bell size={19} /></span>
+              <div>
+                <h3>Notifications</h3>
+                <p>Control direct notification delivery for your account.</p>
               </div>
+            </div>
+
+            <label className="profile-toggle-row">
+              <div>
+                <strong>Email notifications</strong>
+                <small>Receive account and operational notifications by email.</small>
+              </div>
+              <input type="checkbox" checked={notificationEmail} onChange={(e) => setNotificationEmail(e.target.checked)} />
+            </label>
+
+            <div className="v2-field">
+              <label>Webhook URL</label>
+              <input className="v2-input" type="url" value={notificationWebhook} onChange={(e) => setNotificationWebhook(e.target.value)} maxLength={500} placeholder="https://example.com/alerts" />
+              <small className="form-hint">Receive real-time JSON payloads on motor alerts and status changes.</small>
             </div>
 
             <div className="profile-action-row">
-              <Button type="submit" variant="secondary" disabled={savingPassword}>
-                <KeyRound size={17} strokeWidth={2.2} />
-                {savingPassword ? "Updating..." : "Update password"}
-              </Button>
+              <button type="submit" className="v2-btn v2-btn-primary" disabled={savingProfile}>
+                <Save size={17} />
+                {savingProfile ? "Saving..." : "Save profile"}
+              </button>
             </div>
 
-            {passwordError ? <div className="error-box">{passwordError}</div> : null}
-            {passwordSuccess ? <div className="success-box">{passwordSuccess}</div> : null}
+            {profileError && <div className="v2-note warning" style={{ marginTop: 10 }}>{profileError}</div>}
+            {profileSuccess && <div className="v2-note" style={{ marginTop: 10, background: "rgba(34,197,94,.08)", color: "var(--ok)" }}>{profileSuccess}</div>}
           </form>
-        </Card>
-
-        <div className="admin-mini-stats">
-          <Card className="info-card compact-stat-card">
-            <div className="compact-stat-icon settings-tone">
-              <UserRound size={18} strokeWidth={2.2} />
-            </div>
-            <div>
-              <span className="compact-stat-label">Display name</span>
-              <strong className="compact-stat-value">{fullName}</strong>
-            </div>
-          </Card>
-
-          <Card className="info-card compact-stat-card">
-            <div className="compact-stat-icon monitor-tone">
-              <ShieldCheck size={18} strokeWidth={2.2} />
-            </div>
-            <div>
-              <span className="compact-stat-label">Role</span>
-              <strong className="compact-stat-value">{roleLabel}</strong>
-            </div>
-          </Card>
-
-          <Card className="info-card compact-stat-card">
-            <div className="compact-stat-icon report-tone">
-              <Mail size={18} strokeWidth={2.2} />
-            </div>
-            <div>
-              <span className="compact-stat-label">Email alerts</span>
-              <strong className="compact-stat-value">{notificationEmail ? "Enabled" : "Disabled"}</strong>
-            </div>
-          </Card>
-
-          <Card className="info-card compact-stat-card">
-            <div className="compact-stat-icon operator-tone">
-              <LockKeyhole size={18} strokeWidth={2.2} />
-            </div>
-            <div>
-              <span className="compact-stat-label">Login count</span>
-              <strong className="compact-stat-value">{profile?.loginCount ?? 0}</strong>
-            </div>
-          </Card>
         </div>
+      </div>
+
+      {/* ── Password & Security ── */}
+      <div className="v2-card profile-security-card">
+        <div className="profile-section-heading">
+          <span className="profile-section-icon t-green"><KeyRound size={19} /></span>
+          <div>
+            <h3>Password and security</h3>
+            <p>Change the password used to sign into this account.</p>
+          </div>
+        </div>
+
+        <form className="profile-form" onSubmit={handlePasswordSubmit}>
+          <div className="v2-field-grid profile-password-grid">
+            <div className="v2-field">
+              <label>Current password</label>
+              <input className="v2-input" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" required />
+            </div>
+            <div className="v2-field">
+              <label>New password</label>
+              <input className="v2-input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={8} autoComplete="new-password" required />
+            </div>
+            <div className="v2-field">
+              <label>Confirm new password</label>
+              <input className="v2-input" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={8} autoComplete="new-password" required />
+            </div>
+          </div>
+
+          <div className="profile-action-row">
+            <button type="submit" className="v2-btn v2-btn-soft" disabled={savingPassword}>
+              <KeyRound size={17} />
+              {savingPassword ? "Updating..." : "Update password"}
+            </button>
+          </div>
+
+          {passwordError && <div className="v2-note warning" style={{ marginTop: 10 }}>{passwordError}</div>}
+          {passwordSuccess && <div className="v2-note" style={{ marginTop: 10, background: "rgba(34,197,94,.08)", color: "var(--ok)" }}>{passwordSuccess}</div>}
+        </form>
+      </div>
       </div>
     </DashboardLayout>
   );

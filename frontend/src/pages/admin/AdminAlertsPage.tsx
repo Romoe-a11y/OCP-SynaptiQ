@@ -1,10 +1,21 @@
 import { useState } from "react";
-import { CheckCircle2, UserPlus, Wrench, ChevronsUp } from "lucide-react";
+import {
+  Activity,
+  BellRing,
+  CheckCircle2,
+  ChevronsUp,
+  Cpu,
+  Flame,
+  Thermometer,
+  Timer,
+  TriangleAlert,
+  UserPlus,
+  Wrench,
+  Zap,
+} from "lucide-react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
-import Button from "../../components/common/Button";
 import { useApi } from "../../hooks/useApi";
 import { useToast } from "../../contexts/ToastContext";
 import {
@@ -21,11 +32,25 @@ function formatDate(value?: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function badgeClass(level?: string) {
-  const value = (level ?? "").toUpperCase();
-  if (value.includes("CRIT")) return "data-badge badge-critical";
-  if (value.includes("ELEV") || value.includes("MOY") || value.includes("OPEN") || value.includes("ESCAL")) return "data-badge badge-alert";
-  return "data-badge badge-normal";
+function severityTone(level?: string) {
+  const v = (level ?? "").toUpperCase();
+  if (v.includes("CRIT")) return "t-crit";
+  if (v.includes("ELEV") || v.includes("MOY") || v.includes("WARN") || v.includes("ALER")) return "t-warn";
+  return "t-ok";
+}
+
+function severityBadge(level?: string) {
+  const v = (level ?? "").toUpperCase();
+  if (v.includes("CRIT")) return "v2-badge crit";
+  if (v.includes("ELEV") || v.includes("MOY") || v.includes("WARN") || v.includes("ALER") || v.includes("OPEN") || v.includes("ESCAL")) return "v2-badge warn";
+  return "v2-badge ok";
+}
+
+function severityIcon(level?: string) {
+  const v = (level ?? "").toUpperCase();
+  if (v.includes("CRIT")) return <Thermometer size={19} strokeWidth={2.2} />;
+  if (v.includes("WARN") || v.includes("ALER")) return <Activity size={19} strokeWidth={2.2} />;
+  return <CheckCircle2 size={19} strokeWidth={2.2} />;
 }
 
 export default function AdminAlertsPage() {
@@ -35,18 +60,13 @@ export default function AdminAlertsPage() {
 
   function run(action: Promise<unknown>, label: string) {
     action
-      .then(() => {
-        toast.success(label);
-        reload();
-      })
-      .catch((err) => {
-        toast.error(err?.response?.data || err?.message || "Action failed");
-      });
+      .then(() => { toast.success(label); reload(); })
+      .catch((err) => { toast.error(err?.response?.data || err?.message || "Action failed"); });
   }
 
   if (loading) {
     return (
-      <DashboardLayout title="Admin Alerts" subtitle="Loading..." roleLabel="Administrator">
+      <DashboardLayout title="Alerts" subtitle="Loading..." roleLabel="Administrator">
         <Loader />
       </DashboardLayout>
     );
@@ -54,80 +74,117 @@ export default function AdminAlertsPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="Admin Alerts" subtitle="Unable to load" roleLabel="Administrator">
+      <DashboardLayout title="Alerts" subtitle="Unable to load" roleLabel="Administrator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
   }
 
   const alerts = items ?? [];
+  const openCount = alerts.filter(a => !["RESOLVED", "RESOLU"].includes((a.statut ?? "").toUpperCase())).length;
+  const critCount = alerts.filter(a => (a.gravite ?? "").toUpperCase().includes("CRIT")).length;
+  const resolvedCount = alerts.filter(a => ["RESOLVED", "RESOLU"].includes((a.statut ?? "").toUpperCase())).length;
 
   return (
     <DashboardLayout
-      title="Admin Alerts"
-      subtitle="Database-backed alert lifecycle, assignment and escalation."
+      title="Alerts"
+      subtitle="Database-backed alert lifecycle, assignment and escalation across OCP sites."
       roleLabel="Administrator"
     >
-      <div className="stack">
-        <Card className="info-card">
-          <div className="card-title-row">
-            <h3>Lifecycle controls</h3>
-            <Button variant="secondary" onClick={() => run(escalateOverdueAlerts(), "Overdue alerts escalated")}>
-              <ChevronsUp size={16} />
-              Escalate overdue
-            </Button>
-          </div>
-          <label style={{ display: "grid", gap: "0.5rem", maxWidth: 320 }}>
-            <strong>Assigned technician</strong>
+      {/* KPI row */}
+      <div className="v2-kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+        <div className="v2-kpi">
+          <span className="ic t-crit"><BellRing size={18} strokeWidth={2.2} /></span>
+          <div className="label">Open alerts</div>
+          <div className="value">{openCount}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-crit"><Flame size={18} strokeWidth={2.2} /></span>
+          <div className="label">Critical</div>
+          <div className="value">{critCount}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-warn"><Timer size={18} strokeWidth={2.2} /></span>
+          <div className="label">SLA breaches</div>
+          <div className="value">--</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-ok"><CheckCircle2 size={18} strokeWidth={2.2} /></span>
+          <div className="label">Resolved</div>
+          <div className="value">{resolvedCount}</div>
+        </div>
+      </div>
+
+      {/* Lifecycle controls */}
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head">
+          <h3>Lifecycle controls</h3>
+          <span className="v2-badge neutral">Assignment</span>
+        </div>
+        <div className="v2-field-grid">
+          <div className="v2-field">
+            <label>Assigned technician</label>
             <input
-              className="dashboard-input"
+              className="v2-input"
               value={technician}
-              onChange={(event) => setTechnician(event.target.value)}
+              onChange={(e) => setTechnician(e.target.value)}
             />
-          </label>
-        </Card>
-
-        <Card className="info-card">
-          <div className="card-title-row">
-            <h3>Alert history</h3>
           </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <button type="button" className="v2-btn v2-btn-soft v2-btn-sm" onClick={() => run(escalateOverdueAlerts(), "Overdue alerts escalated")}>
+            <ChevronsUp size={16} /> Escalate overdue
+          </button>
+        </div>
+      </div>
 
-          <div className="list-stack">
-            {alerts.length ? (
-              alerts.map((alert) => (
-                <Card key={alert.id} className="alert-item">
-                  <div className="item-meta">
-                    <span className={badgeClass(alert.gravite)}>{alert.gravite ?? "INFO"}</span>
-                    <span className={badgeClass(alert.statut)}>{alert.statut ?? "N/A"}</span>
-                    <span className="data-badge">SLA {formatDate(alert.slaDeadline)}</span>
+      {/* Alert list */}
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head" style={{ alignItems: "center" }}>
+          <h3>Alert history</h3>
+        </div>
+
+        <div className="v2-rows">
+          {alerts.length ? (
+            alerts.map((alert) => (
+              <div className="v2-row-item" key={alert.id}>
+                <span className={`ri ${severityTone(alert.gravite)}`}>
+                  {severityIcon(alert.gravite)}
+                </span>
+                <div className="body">
+                  <b>{alert.message || `Alert #${alert.id}`}</b>
+                  <div className="meta">
+                    <span className={severityBadge(alert.gravite)}>{alert.gravite ?? "INFO"}</span>
+                    <span className={severityBadge(alert.statut)}>{alert.statut ?? "N/A"}</span>
+                    {alert.machine?.nom && (
+                      <span className="chip"><Cpu size={12} /> {alert.machine.nom}</span>
+                    )}
+                    {alert.assignedTechnician && (
+                      <span className="chip">{alert.assignedTechnician}</span>
+                    )}
+                    {alert.slaDeadline && (
+                      <span className="chip"><Timer size={12} /> SLA {formatDate(alert.slaDeadline)}</span>
+                    )}
                   </div>
-                  <strong>Alert #{alert.id}</strong>
-                  <p>{alert.message}</p>
-                  <p style={{ color: "var(--muted)", marginTop: 0 }}>
-                    Machine {alert.machine?.nom ?? "--"} · Assigned {alert.assignedTechnician ?? "--"} · Created {formatDate(alert.dateCreation)}
-                  </p>
-                  {alert.resolutionNotes ? <p>{alert.resolutionNotes}</p> : null}
-                  <div className="footer-actions">
-                    <Button variant="secondary" onClick={() => run(acknowledgeAlert(alert.id), "Alert acknowledged")}>
-                      <CheckCircle2 size={16} />
-                      Acknowledge
-                    </Button>
-                    <Button variant="secondary" onClick={() => run(assignAlert(alert.id, technician), "Alert assigned")}>
-                      <UserPlus size={16} />
-                      Assign
-                    </Button>
-                    <Button variant="secondary" onClick={() => run(resolveAlert(alert.id, "dashboard", "Resolved from dashboard"), "Alert resolved")}>
-                      <Wrench size={16} />
-                      Resolve
-                    </Button>
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <div className="centered-empty">No alerts available.</div>
-            )}
-          </div>
-        </Card>
+                  {alert.resolutionNotes && <p>{alert.resolutionNotes}</p>}
+                </div>
+                <div className="v2-row-actions">
+                  <button type="button" className="v2-btn v2-btn-soft v2-btn-sm" onClick={() => run(acknowledgeAlert(alert.id), "Alert acknowledged")}>
+                    <CheckCircle2 size={15} /> Ack
+                  </button>
+                  <button type="button" className="v2-btn v2-btn-soft v2-btn-sm" onClick={() => run(assignAlert(alert.id, technician), "Alert assigned")}>
+                    <UserPlus size={15} /> Assign
+                  </button>
+                  <button type="button" className="v2-btn v2-btn-soft v2-btn-sm" onClick={() => run(resolveAlert(alert.id, "dashboard", "Resolved from dashboard"), "Alert resolved")}>
+                    <Wrench size={15} /> Resolve
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="v2-empty">No alerts available.</div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

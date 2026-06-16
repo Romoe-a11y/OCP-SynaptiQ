@@ -17,17 +17,37 @@ const REFRESH_TOKEN_KEY = "refreshToken";
 function loadUser(): LoginResponse | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const accessToken = localStorage.getItem(TOKEN_KEY);
+    if (!raw || !accessToken) {
+      clearPersistedUser();
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as LoginResponse;
+    return {
+      ...parsed,
+      accessToken: parsed.accessToken || accessToken,
+      refreshToken: parsed.refreshToken || localStorage.getItem(REFRESH_TOKEN_KEY) || "",
+    };
   } catch {
+    clearPersistedUser();
     return null;
   }
 }
 
 function persistUser(user: LoginResponse) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  const currentAccessToken = localStorage.getItem(TOKEN_KEY);
+  const currentRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const normalized = {
+    ...user,
+    accessToken: user.accessToken || currentAccessToken || "",
+    refreshToken: user.refreshToken || currentRefreshToken || "",
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   // Keep legacy keys in sync for the Axios interceptor
-  if (user.accessToken) localStorage.setItem(TOKEN_KEY, user.accessToken);
-  if (user.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, user.refreshToken);
+  if (normalized.accessToken) localStorage.setItem(TOKEN_KEY, normalized.accessToken);
+  if (normalized.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, normalized.refreshToken);
   if (user.role) localStorage.setItem("role", user.role);
   if (user.nomComplet) localStorage.setItem("user", user.nomComplet);
 }

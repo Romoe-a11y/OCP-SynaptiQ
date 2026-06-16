@@ -1,0 +1,7 @@
+{
+  "name": "samia-ai-dev-shim",
+  "private": true,
+  "scripts": {
+    "dev": "node ../frontend/scripts/dev-all.cjs"
+  }
+}

@@ -57,6 +57,8 @@ export interface UserAccess {
   notificationWebhook?: string | null;
   active?: boolean | null;
   temporaryPassword?: string | null;
+  emailDeliverySuccessful?: boolean | null;
+  emailDeliveryMessage?: string | null;
 }
 
 export interface UserAccessCreateRequest {

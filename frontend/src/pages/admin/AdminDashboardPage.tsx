@@ -30,7 +30,6 @@ import {
 } from "recharts";
 
 import AlertCard from "../../components/cards/AlertCard";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
 import DashboardLayout from "../../components/layout/DashboardLayout";
@@ -49,25 +48,11 @@ import type {
 } from "../../types";
 
 const chartColors = {
-  temperature: "#a33a3f",
-  current: "#946513",
-  vibration: "#315f9e",
+  temperature: "#b8473d",
+  current: "#9a6b14",
+  vibration: "#2f6aa8",
   rpm: "#237246",
   alert: "#256f4c",
-};
-
-type KpiProps = {
-  label: string;
-  value: ReactNode;
-  icon: ReactNode;
-  toneClass: string;
-};
-
-type SignalTileProps = {
-  label: string;
-  value: ReactNode;
-  icon: ReactNode;
-  toneClass: string;
 };
 
 function formatDate(value?: string) {
@@ -92,10 +77,10 @@ function formatShortTime(value?: string) {
       });
 }
 
-function statusClass(status?: string) {
-  if (status === "CRITIQUE") return "badge-critical";
-  if (status === "ALERTE") return "badge-alert";
-  return "badge-normal";
+function statusBadge(status?: string) {
+  if (status === "CRITIQUE") return "v2-badge crit";
+  if (status === "ALERTE") return "v2-badge warn";
+  return "v2-badge ok";
 }
 
 function getSeverityValue(alert: any) {
@@ -110,7 +95,6 @@ function getSeverityValue(alert: any) {
 
 function normalizeSeverity(value?: string) {
   const normalized = (value ?? "").toUpperCase();
-
   if (normalized.includes("CRIT")) return "Critical";
   if (normalized.includes("ALER") || normalized.includes("WARN")) return "Warning";
   if (normalized.includes("NORM")) return "Normal";
@@ -150,7 +134,6 @@ function sanitizeExplanation(value?: unknown) {
 
 function parseMetrics(metricsJson: unknown) {
   if (!metricsJson || typeof metricsJson !== "string") return [];
-
   try {
     const parsed = JSON.parse(metricsJson) as Record<string, unknown>;
     return Object.entries(parsed)
@@ -163,32 +146,6 @@ function parseMetrics(metricsJson: unknown) {
   } catch {
     return [];
   }
-}
-
-function DashboardKpi({ label, value, icon, toneClass }: KpiProps) {
-  return (
-    <Card className="info-card kpi-card">
-      <div className="kpi-header">
-        <div>
-          <span className="kpi-label">{label}</span>
-          <strong className="kpi-value">{value}</strong>
-        </div>
-        <div className={`kpi-icon ${toneClass}`}>{icon}</div>
-      </div>
-    </Card>
-  );
-}
-
-function SignalTile({ label, value, icon, toneClass }: SignalTileProps) {
-  return (
-    <div className="signal-tile">
-      <div className={`signal-icon ${toneClass}`}>{icon}</div>
-      <div className="signal-copy">
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-    </div>
-  );
 }
 
 function CustomChartTooltip({
@@ -236,7 +193,7 @@ export default function AdminDashboardPage() {
         operational: operationalData,
       })),
     [],
-    3_000, // Auto-refresh every 3 seconds
+    3_000,
   );
 
   const data = bundle?.data ?? null;
@@ -274,18 +231,11 @@ export default function AdminDashboardPage() {
   }, [recentMeasures]);
 
   const alertSeverityData = useMemo(() => {
-    const counts = {
-      Critical: 0,
-      Warning: 0,
-      Normal: 0,
-      Other: 0,
-    };
-
+    const counts = { Critical: 0, Warning: 0, Normal: 0, Other: 0 };
     (data?.alertes ?? []).forEach((alert: any) => {
       const severity = normalizeSeverity(getSeverityValue(alert));
       counts[severity as keyof typeof counts] += 1;
     });
-
     return [
       { label: "Critical", value: counts.Critical },
       { label: "Warning", value: counts.Warning },
@@ -346,52 +296,9 @@ export default function AdminDashboardPage() {
   const predictionUsesFallback = /fallback|unavailable/i.test(predictionExplanation);
   const modelMetrics = parseMetrics(operational?.modelHealth?.metricsJson);
 
-  const kpis = [
-    {
-      label: "Measures",
-      value: stats?.totalMesures ?? "--",
-      icon: <BarChart3 size={18} strokeWidth={2.2} />,
-      toneClass: "vibration-tone",
-    },
-    {
-      label: "Active alerts",
-      value: stats?.totalAlertesActives ?? "--",
-      icon: <BellRing size={18} strokeWidth={2.2} />,
-      toneClass: "critical-tone",
-    },
-    {
-      label: "Anomalies",
-      value: stats?.totalAnomalies ?? "--",
-      icon: <TriangleAlert size={18} strokeWidth={2.2} />,
-      toneClass: "warning-tone",
-    },
-    {
-      label: "Avg temperature",
-      value: avgTemp ? `${avgTemp} °C` : "--",
-      icon: <Thermometer size={18} strokeWidth={2.2} />,
-      toneClass: "temperature-tone",
-    },
-    {
-      label: "Drift health",
-      value: driftStatus,
-      icon: <ShieldCheck size={18} strokeWidth={2.2} />,
-      toneClass: driftStatus === "DRIFT" ? "critical-tone" : "vibration-tone",
-    },
-    {
-      label: "Model health",
-      value: modelStatus,
-      icon: <BrainCircuit size={18} strokeWidth={2.2} />,
-      toneClass: "normal-tone",
-    },
-  ];
-
   if (loading) {
     return (
-      <DashboardLayout
-        title="Dashboard"
-        subtitle="Loading data..."
-        roleLabel="Administrator"
-      >
+      <DashboardLayout title="Dashboard" subtitle="Loading data..." roleLabel="Administrator">
         <Loader />
       </DashboardLayout>
     );
@@ -399,11 +306,7 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <DashboardLayout
-        title="Dashboard"
-        subtitle="Unable to load data"
-        roleLabel="Administrator"
-      >
+      <DashboardLayout title="Dashboard" subtitle="Unable to load data" roleLabel="Administrator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
@@ -415,168 +318,169 @@ export default function AdminDashboardPage() {
       subtitle="Live motor health, anomaly flow and operational risk."
       roleLabel="Administrator"
     >
-      <div className="admin-kpi-grid">
-        {kpis.map((kpi) => (
-          <DashboardKpi key={kpi.label} {...kpi} />
-        ))}
+      {/* ── KPI GRID ── */}
+      <div className="v2-kpi-grid">
+        <div className="v2-kpi">
+          <span className="ic t-vib"><BarChart3 size={18} strokeWidth={2.2} /></span>
+          <div className="label">Measures</div>
+          <div className="value">{stats?.totalMesures ?? "--"}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-crit"><BellRing size={18} strokeWidth={2.2} /></span>
+          <div className="label">Active alerts</div>
+          <div className="value">{stats?.totalAlertesActives ?? "--"}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-warn"><TriangleAlert size={18} strokeWidth={2.2} /></span>
+          <div className="label">Anomalies</div>
+          <div className="value">{stats?.totalAnomalies ?? "--"}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-temp"><Thermometer size={18} strokeWidth={2.2} /></span>
+          <div className="label">Avg temperature</div>
+          <div className="value">{avgTemp ? <>{avgTemp}<small> °C</small></> : "--"}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className={`ic ${driftStatus === "DRIFT" ? "t-crit" : "t-ok"}`}>
+            <ShieldCheck size={18} strokeWidth={2.2} />
+          </span>
+          <div className="label">Drift health</div>
+          <div className="value" style={{ fontSize: "1.15rem" }}>{driftStatus}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-purple"><BrainCircuit size={18} strokeWidth={2.2} /></span>
+          <div className="label">Model health</div>
+          <div className="value" style={{ fontSize: "1.15rem" }}>{modelStatus}</div>
+        </div>
       </div>
 
-      <div className="admin-dashboard-grid dashboard-flow">
-        <div className="stack">
-          <Card className="info-card">
-            <div className="asset-header">
-              <div className="asset-title-wrap">
-                <div className="asset-icon">
-                  <Cpu size={22} strokeWidth={2.2} />
-                </div>
+      {/* ── MAIN 2-COL GRID ── */}
+      <div className="v2-grid-2">
+        <div className="v2-stack">
+          {/* Monitored asset */}
+          <div className="v2-card v2-card-pad">
+            <div className="v2-asset-head">
+              <div className="v2-asset-id">
+                <span className="ai t-green"><Cpu size={23} strokeWidth={2.2} /></span>
                 <div>
-                  <div className="asset-meta-label">Monitored asset</div>
-                  <h3 className="asset-name">{latestMeasure?.nomMachine ?? "--"}</h3>
-                  <p className="asset-updated">
-                    Updated {formatDate(latestMeasure?.horodatage)}
-                  </p>
+                  <div className="meta">Monitored asset</div>
+                  <h3>{latestMeasure?.nomMachine ?? "--"}</h3>
+                  <div className="upd">Updated {formatDate(latestMeasure?.horodatage)}</div>
                 </div>
               </div>
-
-              <span className={`data-badge ${statusClass(status)}`}>{status}</span>
+              <span className={statusBadge(status)}>{status}</span>
             </div>
 
-            <div className="signal-grid">
-              <SignalTile
-                label="Temperature"
-                value={`${latestMeasure?.temperature ?? "--"} °C`}
-                icon={<Thermometer size={19} strokeWidth={2.2} />}
-                toneClass="temperature-tone"
-              />
-              <SignalTile
-                label="Current"
-                value={`${latestMeasure?.courant ?? "--"} A`}
-                icon={<Zap size={19} strokeWidth={2.2} />}
-                toneClass="current-tone"
-              />
-              <SignalTile
-                label="Vibration"
-                value={latestMeasure?.vibration ?? "--"}
-                icon={<Activity size={19} strokeWidth={2.2} />}
-                toneClass="vibration-tone"
-              />
-              <SignalTile
-                label="RPM"
-                value={latestMeasure?.rpm ?? "--"}
-                icon={<Gauge size={19} strokeWidth={2.2} />}
-                toneClass="rpm-tone"
-              />
+            <div className="v2-signals">
+              <div className="v2-signal">
+                <div className="st"><span className="si t-temp"><Thermometer size={16} strokeWidth={2.2} /></span><span className="sl">Temp</span></div>
+                <div className="sv">{latestMeasure?.temperature ?? "--"}<small> °C</small></div>
+              </div>
+              <div className="v2-signal">
+                <div className="st"><span className="si t-cur"><Zap size={16} strokeWidth={2.2} /></span><span className="sl">Current</span></div>
+                <div className="sv">{latestMeasure?.courant ?? "--"}<small> A</small></div>
+              </div>
+              <div className="v2-signal">
+                <div className="st"><span className="si t-vib"><Activity size={16} strokeWidth={2.2} /></span><span className="sl">Vibration</span></div>
+                <div className="sv">{latestMeasure?.vibration ?? "--"}</div>
+              </div>
+              <div className="v2-signal">
+                <div className="st"><span className="si t-ok"><Gauge size={16} strokeWidth={2.2} /></span><span className="sl">Speed</span></div>
+                <div className="sv">{latestMeasure?.rpm ?? "--"}<small> rpm</small></div>
+              </div>
             </div>
 
-            <div className="card-footer-meta">
+            <div className="v2-asset-foot">
+              <Database size={15} strokeWidth={2.1} />
               {recentMeasures.length} recent samples loaded
             </div>
-          </Card>
+          </div>
 
-          <Card className="info-card">
-            <div className="chart-card-header">
+          {/* Temperature chart */}
+          <div className="v2-card v2-card-pad">
+            <div className="v2-card-head">
               <div>
-                <span className="card-eyebrow">Trend</span>
+                <div className="eyebrow">Trend</div>
                 <h3>Temperature evolution</h3>
               </div>
-              <div className="chart-icon temperature-tone">
-                <Thermometer size={18} strokeWidth={2.2} />
-              </div>
+              <span className="ci t-temp"><Thermometer size={18} strokeWidth={2.2} /></span>
             </div>
-
             <div className="chart-shell">
               <ResponsiveContainer>
                 <LineChart data={temperatureTrendData}>
-                  <CartesianGrid stroke="rgba(23, 33, 27, 0.08)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64706a" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "#64706a" }} />
+                  <CartesianGrid stroke="rgba(23,33,27,.08)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#5d6c63" }} />
+                  <YAxis tick={{ fontSize: 12, fill: "#5d6c63" }} />
                   <Tooltip content={<CustomChartTooltip />} />
-                  <Line
-                    type="monotone"
-                    dataKey="temperature"
-                    name="Temperature"
-                    stroke={chartColors.temperature}
-                    strokeWidth={3}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
+                  <Line type="monotone" dataKey="temperature" name="Temperature" stroke={chartColors.temperature} strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </Card>
+          </div>
         </div>
 
-        <div className="stack">
-          <Card className="info-card">
-            <div className="chart-card-header">
+        <div className="v2-stack">
+          {/* Alerts by severity */}
+          <div className="v2-card v2-card-pad">
+            <div className="v2-card-head">
               <div>
-                <span className="card-eyebrow">Distribution</span>
+                <div className="eyebrow">Distribution</div>
                 <h3>Alerts by severity</h3>
               </div>
-              <div className="chart-icon critical-tone">
-                <BellRing size={18} strokeWidth={2.2} />
-              </div>
+              <span className="ci t-crit"><BellRing size={18} strokeWidth={2.2} /></span>
             </div>
-
             <div className="chart-shell">
               <ResponsiveContainer>
                 <BarChart data={alertSeverityData}>
-                  <CartesianGrid stroke="rgba(23, 33, 27, 0.08)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64706a" }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#64706a" }} />
+                  <CartesianGrid stroke="rgba(23,33,27,.08)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#5d6c63" }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#5d6c63" }} />
                   <Tooltip content={<CustomChartTooltip />} />
-                  <Bar
-                    dataKey="value"
-                    name="Alerts"
-                    fill={chartColors.alert}
-                    radius={[6, 6, 0, 0]}
-                  />
+                  <Bar dataKey="value" name="Alerts" fill={chartColors.alert} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </Card>
+          </div>
 
-          <Card className="info-card">
-            <div className="card-title-row">
+          {/* Recent alerts */}
+          <div className="v2-card v2-card-pad">
+            <div className="v2-card-head" style={{ alignItems: "center" }}>
               <h3>Recent alerts</h3>
-              <button
-                type="button"
-                className="card-action-link card-link-button"
-                onClick={() => navigate("/admin/alerts")}
-              >
+              <button type="button" className="v2-link-btn" onClick={() => navigate("/admin/alerts")}>
                 View all
               </button>
             </div>
-
-            <div className="list-stack">
+            <div className="v2-alerts">
               {recentAlerts.length ? (
                 recentAlerts.map((alert) => (
                   <AlertCard key={alert.id} alert={alert} />
                 ))
               ) : (
-                <div className="centered-empty">No alerts currently available.</div>
+                <div className="v2-empty">No alerts currently available.</div>
               )}
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 
-      <div className="admin-bottom-grid">
-        <Card className="info-card">
-          <div className="card-title-row">
+      {/* ── BOTTOM 3-COL GRID ── */}
+      <div className="v2-grid-3">
+        {/* RUL trend */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
             <h3>RUL trend</h3>
-            <span className="data-badge">
+            <span className="v2-badge neutral">
               {operational?.rulTrend?.[0]?.simulated ? "Simulated" : "Model"}
             </span>
           </div>
           {hasRulTrend ? (
             <>
-              <div className="ops-card-summary">
-                <div>
+              <div className="v2-summary-row">
+                <div className="v2-summary-box">
                   <span>Latest remaining life</span>
                   <strong>{formatDays(latestRulDays)}</strong>
                 </div>
-                <div>
+                <div className="v2-summary-box">
                   <span>Confidence</span>
                   <strong>{formatPercent(latestRulConfidence)}</strong>
                 </div>
@@ -584,227 +488,169 @@ export default function AdminDashboardPage() {
               <div className="chart-shell chart-shell-sm">
                 <ResponsiveContainer>
                   <LineChart data={rulTrendData}>
-                    <CartesianGrid stroke="rgba(23, 33, 27, 0.08)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64706a" }} />
-                    <YAxis tick={{ fontSize: 12, fill: "#64706a" }} />
+                    <CartesianGrid stroke="rgba(23,33,27,.08)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#5d6c63" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "#5d6c63" }} />
                     <Tooltip content={<CustomChartTooltip />} />
-                    <Line
-                      type="monotone"
-                      dataKey="rulDays"
-                      name="RUL days"
-                      stroke={chartColors.vibration}
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
+                    <Line type="monotone" dataKey="rulDays" name="RUL days" stroke={chartColors.vibration} strokeWidth={3} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </>
           ) : (
-            <div className="ops-empty-state">
-              <Timer size={22} strokeWidth={2.1} />
+            <div className="v2-empty">
               <div>
-                <strong>RUL history not ready</strong>
-                <p>
-                  Remaining-life trend needs at least two valid model outputs. Keep ingestion and RUL prediction running to build this curve.
+                <Timer size={22} strokeWidth={2.1} />
+                <strong style={{ display: "block", marginTop: 8 }}>RUL history not ready</strong>
+                <p style={{ marginTop: 4 }}>
+                  Remaining-life trend needs at least two valid model outputs.
                 </p>
               </div>
             </div>
           )}
-        </Card>
+        </div>
 
-        <Card className="info-card">
-          <div className="card-title-row">
+        {/* Anomaly score trend */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
             <h3>Anomaly score trend</h3>
-            <span
-              className={
-                driftStatus === "DRIFT"
-                  ? "data-badge badge-critical"
-                  : "data-badge badge-normal"
-              }
-            >
+            <span className={driftStatus === "DRIFT" ? "v2-badge crit" : "v2-badge ok"}>
               Drift {driftStatus}
             </span>
           </div>
           <div className="chart-shell chart-shell-sm">
             <ResponsiveContainer>
               <LineChart data={anomalyTrendData}>
-                <CartesianGrid stroke="rgba(23, 33, 27, 0.08)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64706a" }} />
-                <YAxis tick={{ fontSize: 12, fill: "#64706a" }} />
+                <CartesianGrid stroke="rgba(23,33,27,.08)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#5d6c63" }} />
+                <YAxis tick={{ fontSize: 12, fill: "#5d6c63" }} />
                 <Tooltip content={<CustomChartTooltip />} />
-                <Line
-                  type="monotone"
-                  dataKey="anomalyScore"
-                  name="Anomaly score"
-                  stroke={chartColors.temperature}
-                  strokeWidth={3}
-                  dot={{ r: 3 }}
-                />
+                <Line type="monotone" dataKey="anomalyScore" name="Anomaly score" stroke={chartColors.temperature} strokeWidth={3} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        </div>
 
-        <Card className="info-card">
-          <div className="card-title-row">
+        {/* Feature trends */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
             <h3>Feature trends</h3>
           </div>
           <div className="chart-shell">
             <ResponsiveContainer>
               <LineChart data={featureTrendData}>
-                <CartesianGrid stroke="rgba(23, 33, 27, 0.08)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64706a" }} />
-                <YAxis tick={{ fontSize: 12, fill: "#64706a" }} />
+                <CartesianGrid stroke="rgba(23,33,27,.08)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#5d6c63" }} />
+                <YAxis tick={{ fontSize: 12, fill: "#5d6c63" }} />
                 <Tooltip content={<CustomChartTooltip />} />
-                <Line
-                  type="monotone"
-                  dataKey="temperature"
-                  name="Temperature"
-                  stroke={chartColors.temperature}
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="courant"
-                  name="Current"
-                  stroke={chartColors.current}
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="vibration"
-                  name="Vibration"
-                  stroke={chartColors.vibration}
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="rpm"
-                  name="RPM"
-                  stroke={chartColors.rpm}
-                  strokeWidth={2}
-                  dot={false}
-                />
+                <Line type="monotone" dataKey="temperature" name="Temperature" stroke={chartColors.temperature} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="courant" name="Current" stroke={chartColors.current} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="vibration" name="Vibration" stroke={chartColors.vibration} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="rpm" name="RPM" stroke={chartColors.rpm} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        </div>
 
-        <Card className="info-card">
-          <div className="card-title-row">
+        {/* Prediction explanation */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
             <h3>Prediction explanation</h3>
-            <div className={`data-badge ${predictionUsesFallback ? "badge-alert" : "badge-normal"}`}>
-              <Timer size={14} />
+            <span className={`v2-badge ${predictionUsesFallback ? "warn" : "ok"}`}>
+              <Timer size={13} />
               {predictionUsesFallback ? "Fallback" : latestExplanation?.timestamp
                 ? formatDate(String(latestExplanation.timestamp))
                 : "No data"}
-            </div>
+            </span>
           </div>
           {latestExplanation ? (
-            <div className="ops-explanation-card">
-              <div className="ops-explanation-main">
+            <>
+              <div className="v2-explain">
                 <span>Predicted condition</span>
                 <strong>{String(latestExplanation.label ?? "Latest prediction")}</strong>
                 <p>{String(latestExplanation.decision ?? "No decision recorded")}</p>
               </div>
-              <div className={predictionUsesFallback ? "ops-service-note warning" : "ops-service-note"}>
-                <Info size={17} strokeWidth={2.1} />
+              <div className={predictionUsesFallback ? "v2-note warning" : "v2-note"}>
+                <Info size={16} strokeWidth={2.1} />
                 <p>{predictionExplanation}</p>
               </div>
-            </div>
+            </>
           ) : (
-            <div className="centered-empty">No prediction explanation available.</div>
+            <div className="v2-empty">No prediction explanation available.</div>
           )}
-        </Card>
+        </div>
 
-        <Card className="info-card">
-          <div className="card-title-row">
+        {/* Active machine status */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
             <h3>Active machine status</h3>
           </div>
-          <div className="list-stack">
-            {(operational?.activeMachineStatus ?? []).length ? (
-              (operational?.activeMachineStatus ?? []).slice(0, 6).map((machine) => (
-                <div className="history-measure-card" key={String(machine.id)}>
-                  <div className="history-measure-top">
-                    <div>
-                      <h4 className="history-measure-title">
-                        {String(machine.name ?? "--")}
-                      </h4>
-                      <p className="history-measure-date">
-                        {String(machine.location ?? "--")}
-                      </p>
-                    </div>
-                    <span
-                      className={`data-badge ${statusClass(String(machine.status ?? ""))}`}
-                    >
-                      {String(machine.status ?? "--")}
-                    </span>
-                  </div>
+          {(operational?.activeMachineStatus ?? []).length ? (
+            (operational?.activeMachineStatus ?? []).slice(0, 6).map((machine) => (
+              <div className="v2-machine-row" key={String(machine.id)}>
+                <div>
+                  <h4>{String(machine.name ?? "--")}</h4>
+                  <p>{String(machine.location ?? "--")}</p>
                 </div>
-              ))
-            ) : (
-              <div className="centered-empty">No active machine status available.</div>
-            )}
-          </div>
-        </Card>
+                <span className={statusBadge(String(machine.status ?? ""))}>{String(machine.status ?? "--")}</span>
+              </div>
+            ))
+          ) : (
+            <div className="v2-empty">No active machine status available.</div>
+          )}
+        </div>
 
-        <Card className="info-card">
-          <div className="card-title-row">
+        {/* Model health */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
             <h3>Model health</h3>
-            <span className="data-badge">
+            <span className="v2-badge neutral">
               {String(operational?.modelHealth?.status ?? "development")}
             </span>
           </div>
-          <div className="ops-model-health">
-            <div className="ops-model-primary">
-              <BrainCircuit size={22} strokeWidth={2.1} />
-              <div>
-                <span>Production model</span>
-                <strong>{String(operational?.modelHealth?.modelName ?? "diagnostic_model")}</strong>
-              </div>
-            </div>
 
-            <div className="ops-model-grid">
-              <div>
-                <ShieldCheck size={16} strokeWidth={2.1} />
-                <span>Version</span>
-                <strong>v{String(operational?.modelHealth?.version ?? "--")}</strong>
-              </div>
-              <div>
-                <Timer size={16} strokeWidth={2.1} />
-                <span>Training date</span>
-                <strong>{formatDate(String(operational?.modelHealth?.trainingDate ?? ""))}</strong>
-              </div>
-              <div>
-                <Server size={16} strokeWidth={2.1} />
-                <span>Registry status</span>
-                <strong>{String(operational?.modelHealth?.status ?? "development")}</strong>
-              </div>
-              <div>
-                <Database size={16} strokeWidth={2.1} />
-                <span>Artifact</span>
-                <strong>{operational?.modelHealth?.artifactPath ? "Registered" : "Not linked"}</strong>
-              </div>
+          <div className="v2-ml-primary">
+            <span className="mi t-green"><BrainCircuit size={20} strokeWidth={2.1} /></span>
+            <div>
+              <span>Production model</span>
+              <strong>{String(operational?.modelHealth?.modelName ?? "diagnostic_model")}</strong>
             </div>
-
-            {modelMetrics.length ? (
-              <div className="ops-model-metrics">
-                {modelMetrics.map((metric) => (
-                  <div key={metric.label}>
-                    <span>{metric.label}</span>
-                    <strong>{metric.value}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="ops-model-note">No validation metrics are recorded in the model registry.</p>
-            )}
           </div>
-        </Card>
+
+          <div className="v2-ml-grid">
+            <div className="v2-ml-cell">
+              <ShieldCheck size={15} strokeWidth={2.1} />
+              <div><span>Version</span><strong>v{String(operational?.modelHealth?.version ?? "--")}</strong></div>
+            </div>
+            <div className="v2-ml-cell">
+              <Timer size={15} strokeWidth={2.1} />
+              <div><span>Training date</span><strong>{formatDate(String(operational?.modelHealth?.trainingDate ?? ""))}</strong></div>
+            </div>
+            <div className="v2-ml-cell">
+              <Server size={15} strokeWidth={2.1} />
+              <div><span>Registry status</span><strong>{String(operational?.modelHealth?.status ?? "development")}</strong></div>
+            </div>
+            <div className="v2-ml-cell">
+              <Database size={15} strokeWidth={2.1} />
+              <div><span>Artifact</span><strong>{operational?.modelHealth?.artifactPath ? "Registered" : "Not linked"}</strong></div>
+            </div>
+          </div>
+
+          {modelMetrics.length ? (
+            <div className="v2-ml-metrics">
+              {modelMetrics.map((metric) => (
+                <div key={metric.label}>
+                  <span>{metric.label}</span>
+                  <strong>{metric.value}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: ".84rem", color: "var(--muted)", marginTop: 12 }}>
+              No validation metrics are recorded in the model registry.
+            </p>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

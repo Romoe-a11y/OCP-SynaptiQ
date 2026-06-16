@@ -1,6 +1,5 @@
-import { BrainCircuit, Clock3, Gauge, ShieldAlert } from "lucide-react";
+import { BrainCircuit, Clock3, Gauge, ShieldAlert, TrendingUp } from "lucide-react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
 import { useApi } from "../../hooks/useApi";
@@ -12,11 +11,18 @@ function formatDate(value?: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function badgeClass(level?: string) {
-  const value = (level ?? "").toUpperCase();
-  if (value.includes("CRIT")) return "data-badge badge-critical";
-  if (value.includes("ELEV") || value.includes("MOY") || value.includes("ALER")) return "data-badge badge-alert";
-  return "data-badge badge-normal";
+function riskTone(level?: string) {
+  const v = (level ?? "").toUpperCase();
+  if (v.includes("CRIT")) return "t-crit";
+  if (v.includes("ELEV") || v.includes("MOY") || v.includes("ALER")) return "t-warn";
+  return "t-ok";
+}
+
+function riskBadge(level?: string) {
+  const v = (level ?? "").toUpperCase();
+  if (v.includes("CRIT")) return "v2-badge crit";
+  if (v.includes("ELEV") || v.includes("MOY") || v.includes("ALER")) return "v2-badge warn";
+  return "v2-badge ok";
 }
 
 export default function AdminPredictionsPage() {
@@ -24,7 +30,7 @@ export default function AdminPredictionsPage() {
 
   if (loading) {
     return (
-      <DashboardLayout title="Admin Predictions" subtitle="Loading..." roleLabel="Administrator">
+      <DashboardLayout title="Predictions" subtitle="Loading..." roleLabel="Administrator">
         <Loader />
       </DashboardLayout>
     );
@@ -32,7 +38,7 @@ export default function AdminPredictionsPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="Admin Predictions" subtitle="Unable to load" roleLabel="Administrator">
+      <DashboardLayout title="Predictions" subtitle="Unable to load" roleLabel="Administrator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
@@ -42,51 +48,42 @@ export default function AdminPredictionsPage() {
 
   return (
     <DashboardLayout
-      title="Admin Predictions"
+      title="Predictions"
       subtitle="Persisted prediction audit trail with model metadata and explanations."
       roleLabel="Administrator"
     >
-      <Card className="info-card">
-        <div className="card-title-row">
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head" style={{ alignItems: "center" }}>
           <h3>Prediction register</h3>
+          <span className="v2-badge neutral">{predictions.length} records</span>
         </div>
 
-        <div className="list-stack">
+        <div className="v2-rows">
           {predictions.length ? (
             predictions.map((prediction) => (
-              <Card key={prediction.id} className="prediction-item">
-                <div className="item-meta">
-                  <span className={badgeClass(prediction.niveauRisque)}>{prediction.niveauRisque ?? "INFO"}</span>
-                  <span className="data-badge">Confidence {prediction.confiance ?? "--"}%</span>
-                  <span className="data-badge">Model {prediction.modelName ?? "diagnostic"} v{prediction.modelVersion ?? "--"}</span>
-                </div>
-                <strong>{prediction.outputLabel ?? prediction.statutPredit ?? "Prediction"}</strong>
-                <p>{prediction.explanation ?? "No explanation stored for this prediction."}</p>
-                <div className="history-measure-stats">
-                  <div className="history-stat-pill">
-                    <ShieldAlert size={16} />
-                    <span>{prediction.finalDecision ?? "--"}</span>
-                  </div>
-                  <div className="history-stat-pill">
-                    <BrainCircuit size={16} />
-                    <span>Anomaly {prediction.anomalyScore ?? "--"}</span>
-                  </div>
-                  <div className="history-stat-pill">
-                    <Gauge size={16} />
-                    <span>RUL {prediction.rulDays ?? "--"} d</span>
-                  </div>
-                  <div className="history-stat-pill">
-                    <Clock3 size={16} />
-                    <span>{formatDate(prediction.dateCreation)}</span>
+              <div className="v2-row-item" key={prediction.id}>
+                <span className={`ri ${riskTone(prediction.niveauRisque)}`}>
+                  <TrendingUp size={19} strokeWidth={2.2} />
+                </span>
+                <div className="body">
+                  <b>{prediction.outputLabel ?? prediction.statutPredit ?? "Prediction"}</b>
+                  <p>{prediction.explanation ?? "No explanation stored for this prediction."}</p>
+                  <div className="meta">
+                    <span className={riskBadge(prediction.niveauRisque)}>{prediction.niveauRisque ?? "INFO"}</span>
+                    <span className="chip">Confidence {prediction.confiance ?? "--"}%</span>
+                    <span className="chip"><BrainCircuit size={12} /> {prediction.modelName ?? "diagnostic"} v{prediction.modelVersion ?? "--"}</span>
+                    <span className="chip"><ShieldAlert size={12} /> {prediction.finalDecision ?? "--"}</span>
+                    <span className="chip"><Gauge size={12} /> RUL {prediction.rulDays ?? "--"} d</span>
+                    <span className="chip"><Clock3 size={12} /> {formatDate(prediction.dateCreation)}</span>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))
           ) : (
-            <div className="centered-empty">No predictions available.</div>
+            <div className="v2-empty">No predictions available.</div>
           )}
         </div>
-      </Card>
+      </div>
     </DashboardLayout>
   );
 }

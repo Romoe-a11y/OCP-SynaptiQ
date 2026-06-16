@@ -28,6 +28,7 @@ Usage:
 
 import argparse
 import math
+import os
 import random
 import sys
 import time
@@ -36,12 +37,10 @@ from datetime import datetime
 import requests
 
 # ─── Configuration ───────────────────────────────────────────
-BACKEND_URL = "http://localhost:8080"
-LOGIN_ENDPOINT = f"{BACKEND_URL}/api/auth/login"
-INGEST_ENDPOINT = f"{BACKEND_URL}/api/ingestion/measurements"
-
-ADMIN_EMAIL = "admin@gmail.com"
-ADMIN_PASSWORD = "admin123"
+DEFAULT_BACKEND_URL = os.getenv("SYNAPTIQ_BACKEND_URL", os.getenv("BACKEND_URL", "http://localhost:8080")).rstrip("/")
+DEFAULT_ADMIN_EMAIL = os.getenv("SYNAPTIQ_ADMIN_EMAIL", "admin@gmail.com")
+DEFAULT_ADMIN_PASSWORD = os.getenv("SYNAPTIQ_ADMIN_PASSWORD", os.getenv("SYNAPTIQ_PASSWORD", "admin123"))
+DEFAULT_TOKEN = os.getenv("SYNAPTIQ_TOKEN", "")
 
 # ─── OCP Khouribga Real Machine Profiles ─────────────────────
 # Each profile defines physically accurate operating ranges based on
@@ -213,12 +212,16 @@ SHIFTS = {
 }
 
 
-def authenticate() -> str:
-    print(f"  Authenticating as {ADMIN_EMAIL}...")
+def authenticate(backend_url: str, email: str, password: str, token: str = "") -> str:
+    if token:
+        print("  Using token from --token/SYNAPTIQ_TOKEN.")
+        return token
+
+    print(f"  Authenticating as {email}...")
     try:
-        resp = requests.post(LOGIN_ENDPOINT, json={
-            "email": ADMIN_EMAIL,
-            "motDePasse": ADMIN_PASSWORD,
+        resp = requests.post(f"{backend_url}/api/auth/login", json={
+            "email": email,
+            "motDePasse": password,
         }, timeout=10)
         resp.raise_for_status()
         token = resp.json().get("token") or resp.json().get("accessToken")
@@ -228,8 +231,26 @@ def authenticate() -> str:
         print(f"  Authenticated.")
         return token
     except requests.exceptions.ConnectionError:
-        print(f"  ERROR: Cannot connect to backend at {BACKEND_URL}")
+        print(f"  ERROR: Cannot connect to backend at {backend_url}")
         print(f"  Make sure the Spring Boot backend is running.")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else "unknown"
+        detail = ""
+        try:
+            detail = e.response.json().get("error", "")
+        except Exception:
+            detail = e.response.text if e.response is not None else ""
+        print(f"  ERROR: Authentication failed with HTTP {status}: {detail or 'no response body'}")
+        if status == 401:
+            print("  The backend rejected these credentials.")
+            print("  If this backend is connected to Supabase or another shared database, use the current admin password:")
+            print('    $env:SYNAPTIQ_ADMIN_PASSWORD="<current-admin-password>"')
+            print("    python scripts/simulator.py --all --fault bearing_wear --interval 3")
+            print("  You can also pass --email, --password, --backend-url, or --token.")
+        elif status == 423:
+            print("  This account is locked. Unlock/reset it in the database or from another active admin account.")
+            print("  The helper scripts/fix_password.py now resets admin@gmail.com to admin123 and unlocks the account.")
         sys.exit(1)
     except Exception as e:
         print(f"  ERROR: Authentication failed: {e}")
@@ -325,7 +346,7 @@ def generate_reading(machine: dict, fault: dict, step: int, load_factor: float) 
     }
 
 
-def send_measurement(token: str, machine_id: int, reading: dict) -> dict:
+def send_measurement(backend_url: str, token: str, machine_id: int, reading: dict) -> dict:
     payload = {
         "measurements": [{
             "machineId": machine_id,
@@ -338,12 +359,12 @@ def send_measurement(token: str, machine_id: int, reading: dict) -> dict:
         "runPrediction": True,
     }
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    resp = requests.post(INGEST_ENDPOINT, json=payload, headers=headers, timeout=120)
+    resp = requests.post(f"{backend_url}/api/ingestion/measurements", json=payload, headers=headers, timeout=120)
     resp.raise_for_status()
     return resp.json()
 
 
-def print_banner(machine: dict, fault_name: str, fault: dict, shift: dict, interval: float):
+def print_banner(machine: dict, fault_name: str, fault: dict, shift: dict, interval: float, backend_url: str):
     print()
     print("=" * 72)
     print("  OCP SynaptiQ — Virtual Sensor Simulator")
@@ -357,7 +378,7 @@ def print_banner(machine: dict, fault_name: str, fault: dict, shift: dict, inter
     print(f"  Shift       : {shift['label']}  (load factor: {shift['load_factor']})")
     print(f"  Interval    : {interval}s between readings")
     print(f"  Drift       : {fault.get('drift') or 'None'}")
-    print(f"  Backend     : {BACKEND_URL}")
+    print(f"  Backend     : {backend_url}")
     print("=" * 72)
     print()
 
@@ -390,8 +411,13 @@ Examples:
     parser.add_argument("--interval", type=float, default=5, help="Seconds between readings")
     parser.add_argument("--count", type=int, default=0, help="Number of readings (0=infinite)")
     parser.add_argument("--all", action="store_true", help="Cycle through all 6 machines")
+    parser.add_argument("--backend-url", default=DEFAULT_BACKEND_URL, help="Backend base URL")
+    parser.add_argument("--email", default=DEFAULT_ADMIN_EMAIL, help="Admin email for simulator ingestion")
+    parser.add_argument("--password", default=DEFAULT_ADMIN_PASSWORD, help="Admin password for simulator ingestion")
+    parser.add_argument("--token", default=DEFAULT_TOKEN, help="Existing admin JWT access token")
     args = parser.parse_args()
 
+    backend_url = args.backend_url.rstrip("/")
     shift = SHIFTS[args.shift]
     fault = FAULTS[args.fault]
     token = None
@@ -414,7 +440,7 @@ Examples:
         print("=" * 72)
         print()
 
-        token = authenticate()
+        token = authenticate(backend_url, args.email, args.password, args.token)
         print()
 
         step = 0
@@ -428,7 +454,7 @@ Examples:
                 for machine in machine_list:
                     reading = generate_reading(machine, fault, step, shift["load_factor"])
                     try:
-                        result = send_measurement(token, machine["id"], reading)
+                        result = send_measurement(backend_url, token, machine["id"], reading)
                         alerts = result.get("alertsCreated", 0)
                         icon = "+" if alerts == 0 else "!"
                         alert_text = " ALERT" if alerts > 0 else ""
@@ -445,7 +471,7 @@ Examples:
                     except requests.exceptions.HTTPError as e:
                         if e.response.status_code == 401:
                             print("  Token expired — re-authenticating...")
-                            token = authenticate()
+                            token = authenticate(backend_url, args.email, args.password)
                             break
                         print(f"  ERROR [{machine['name']}]: {e.response.status_code}")
                     except requests.exceptions.ConnectionError:
@@ -459,8 +485,8 @@ Examples:
     else:
         # Single machine mode
         machine = MACHINES[args.machine]
-        print_banner(machine, args.fault, fault, shift, args.interval)
-        token = authenticate()
+        print_banner(machine, args.fault, fault, shift, args.interval, backend_url)
+        token = authenticate(backend_url, args.email, args.password, args.token)
         print()
 
         step = 0
@@ -473,7 +499,7 @@ Examples:
 
                 reading = generate_reading(machine, fault, step, shift["load_factor"])
                 try:
-                    result = send_measurement(token, machine["id"], reading)
+                    result = send_measurement(backend_url, token, machine["id"], reading)
                     stored = result.get("measurementsStored", 0)
                     preds = result.get("predictionsStored", 0)
                     alerts = result.get("alertsCreated", 0)
@@ -493,7 +519,7 @@ Examples:
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 401:
                         print("  Token expired — re-authenticating...")
-                        token = authenticate()
+                        token = authenticate(backend_url, args.email, args.password)
                         continue
                     print(f"  ERROR: {e.response.status_code} — {e.response.text}")
                 except requests.exceptions.ConnectionError:

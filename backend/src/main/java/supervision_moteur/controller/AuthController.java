@@ -21,15 +21,30 @@ import supervision_moteur.security.JwtService;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final long MAX_PROFILE_IMAGE_BYTES = 10L * 1024L * 1024L;
+    private static final int PROFILE_IMAGE_MAX_DIMENSION = 512;
+    private static final float PROFILE_IMAGE_JPEG_QUALITY = 0.86f;
 
     private final UtilisateurRepository utilisateurRepository;
     private final PasswordEncoder passwordEncoder;
@@ -211,24 +226,19 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "No file provided"));
         }
 
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed"));
-        }
-
-        if (file.getSize() > 2 * 1024 * 1024) {
-            return ResponseEntity.badRequest().body(Map.of("error", "File size must be under 2 MB"));
+        if (file.getSize() > MAX_PROFILE_IMAGE_BYTES) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                    .body(Map.of("error", "Profile picture must be 10 MB or smaller."));
         }
 
         try {
-            String base64 = Base64.getEncoder().encodeToString(file.getBytes());
-            String dataUrl = "data:" + contentType + ";base64," + base64;
+            String dataUrl = normalizeProfilePicture(file);
             utilisateur.setProfilePictureUrl(dataUrl);
             utilisateurRepository.save(utilisateur);
             return ResponseEntity.ok(Map.of("profilePictureUrl", dataUrl, "message", "Profile picture updated"));
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to process the image"));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "The profile picture could not be processed. Use a JPG, PNG, GIF, or BMP image."));
         }
     }
 
@@ -315,5 +325,57 @@ public class AuthController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeProfilePicture(MultipartFile file) throws IOException {
+        BufferedImage original = ImageIO.read(file.getInputStream());
+        if (original == null) {
+            throw new IOException("Unsupported image format");
+        }
+
+        int sourceWidth = original.getWidth();
+        int sourceHeight = original.getHeight();
+        double scale = Math.min(1.0, (double) PROFILE_IMAGE_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight));
+        int targetWidth = Math.max(1, (int) Math.round(sourceWidth * scale));
+        int targetHeight = Math.max(1, (int) Math.round(sourceHeight * scale));
+
+        BufferedImage normalized = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = normalized.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, targetWidth, targetHeight);
+            graphics.drawImage(original, 0, 0, targetWidth, targetHeight, null);
+        } finally {
+            graphics.dispose();
+        }
+
+        byte[] jpegBytes = writeJpeg(normalized);
+        String base64 = Base64.getEncoder().encodeToString(jpegBytes);
+        return "data:image/jpeg;base64," + base64;
+    }
+
+    private byte[] writeJpeg(BufferedImage image) throws IOException {
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+        if (!writers.hasNext()) {
+            throw new IOException("No JPEG writer available");
+        }
+
+        ImageWriter writer = writers.next();
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+             ImageOutputStream imageOutput = ImageIO.createImageOutputStream(output)) {
+            writer.setOutput(imageOutput);
+            ImageWriteParam params = writer.getDefaultWriteParam();
+            if (params.canWriteCompressed()) {
+                params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                params.setCompressionQuality(PROFILE_IMAGE_JPEG_QUALITY);
+            }
+            writer.write(null, new IIOImage(image, null, null), params);
+            return output.toByteArray();
+        } finally {
+            writer.dispose();
+        }
     }
 }

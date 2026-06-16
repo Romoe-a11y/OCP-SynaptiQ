@@ -1,6 +1,7 @@
 """Flask compatibility layer for the Spring Boot backend."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -83,4 +84,8 @@ def home():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    debug = os.getenv("AI_FLASK_DEBUG", "false").lower() in {"1", "true", "yes", "on"}
+    reload = os.getenv("AI_FLASK_RELOAD", "false").lower() in {"1", "true", "yes", "on"}
+    host = os.getenv("AI_API_HOST", "0.0.0.0")
+    port = int(os.getenv("AI_API_PORT", "5001"))
+    app.run(host=host, port=port, debug=debug, use_reloader=reload)

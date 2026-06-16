@@ -43,4 +43,5 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"
 
-ENTRYPOINT ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "5001", "--workers", "2"]
+# Production server: gunicorn with Flask app
+ENTRYPOINT ["gunicorn", "app.app:app", "--bind", "0.0.0.0:5001", "--workers", "2", "--timeout", "120"]

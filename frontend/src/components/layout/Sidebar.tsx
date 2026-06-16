@@ -24,71 +24,82 @@ export default function Sidebar({ roleLabel }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <aside className={`sidebar${menuOpen ? " sidebar-open" : ""}`}>
-      <div className="sb-top-row">
-        <div className="sb-brand">
-          <img src={ocpLogo} alt="OCP logo" className="sb-logo" />
-          <span className="sb-title">OCP SynaptiQ</span>
-        </div>
-
-        <button
-          type="button"
-          className="sb-menu-button"
-          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          {menuOpen ? <X size={20} strokeWidth={2.2} /> : <Menu size={20} strokeWidth={2.2} />}
-        </button>
-      </div>
-
-      <div className="sb-role-pill">
-        <span className="sb-role-dot" />
-        {roleLabel}
-      </div>
-
-      <nav className="sb-nav" aria-label={`${roleLabel} navigation`}>
-        {groups.map((group) => (
-          <div className="sb-group" key={group.label}>
-            <span className="sb-nav-label">{group.label}</span>
-
-            <div className="sb-group-links">
-              {group.items.map((section) => {
-                const Icon = section.icon;
-
-                return (
-                  <NavLink
-                    key={`${group.label}-${section.to}-${section.label}`}
-                    to={section.to}
-                    onClick={() => setMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `sb-link${isActive ? " sb-link-active" : ""}`
-                    }
-                  >
-                    <Icon className="sb-link-icon" size={17} strokeWidth={2.2} />
-                    <span className="sb-link-text">{section.label}</span>
-                  </NavLink>
-                );
-              })}
+    <>
+      <aside className={`sidebar${menuOpen ? " sidebar-open" : ""}`}>
+        <div className="sb-top-row">
+          <div className="sb-brand">
+            <div className="sb-logo-chip">
+              <img src={ocpLogo} alt="OCP logo" className="sb-logo" />
+            </div>
+            <div className="sb-bt">
+              <b className="sb-title">OCP <span>SynaptiQ</span></b>
+              <small className="sb-subtitle">MOTOR INTELLIGENCE</small>
             </div>
           </div>
-        ))}
-      </nav>
 
-      <div className="sb-footer">
-        <button
-          type="button"
-          className="sb-link sb-link-danger sb-logout-button"
-          onClick={() => {
-            logout();
-            setMenuOpen(false);
-            navigate("/select-role", { replace: true });
-          }}
-        >
-          <LogOut size={18} strokeWidth={2.2} />
-          <span>Log out</span>
-        </button>
-      </div>
-    </aside>
+          <button
+            type="button"
+            className="sb-menu-button"
+            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={20} strokeWidth={2.2} /> : <Menu size={20} strokeWidth={2.2} />}
+          </button>
+        </div>
+
+        <div className="sb-role-pill">
+          <span className="sb-role-dot" />
+          {roleLabel}
+        </div>
+
+        <nav className="sb-nav" aria-label={`${roleLabel} navigation`}>
+          {groups.map((group) => (
+            <div className="sb-group" key={group.label}>
+              <span className="sb-nav-label">{group.label}</span>
+
+              <div className="sb-group-links">
+                {group.items.map((section) => {
+                  const Icon = section.icon;
+
+                  return (
+                    <NavLink
+                      key={`${group.label}-${section.to}-${section.label}`}
+                      to={section.to}
+                      onClick={() => setMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `sb-link${isActive ? " sb-link-active" : ""}`
+                      }
+                    >
+                      <Icon className="sb-link-icon" size={18} strokeWidth={2} />
+                      <span className="sb-link-text">{section.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="sb-footer">
+          <button
+            type="button"
+            className="sb-link sb-link-danger sb-logout-button"
+            onClick={() => {
+              logout();
+              setMenuOpen(false);
+              navigate("/select-role", { replace: true });
+            }}
+          >
+            <LogOut size={18} strokeWidth={2} />
+            <span>Sign out</span>
+          </button>
+        </div>
+      </aside>
+      <div
+        className={`sidebar-scrim${menuOpen ? " show" : ""}`}
+        onClick={() => setMenuOpen(false)}
+      />
+    </>
   );
 }

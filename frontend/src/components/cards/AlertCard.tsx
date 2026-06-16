@@ -1,21 +1,35 @@
+import { Cpu, TriangleAlert, Activity, Zap } from "lucide-react";
 import type { AlerteDashboardDto } from "../../types";
-import Card from "../common/Card";
 
-function badgeClass(level: string) {
-  if (level === "CRITIQUE") return "data-badge badge-critical";
-  if (level === "ALERTE") return "data-badge badge-alert";
-  return "data-badge badge-normal";
+function alertTone(level: string) {
+  if (level === "CRITIQUE") return "t-crit";
+  if (level === "ALERTE") return "t-warn";
+  return "t-vib";
+}
+
+function alertBadge(level: string) {
+  if (level === "CRITIQUE") return "v2-badge crit";
+  if (level === "ALERTE") return "v2-badge warn";
+  return "v2-badge ok";
+}
+
+function alertIcon(level: string) {
+  if (level === "CRITIQUE") return <TriangleAlert size={18} strokeWidth={2.2} />;
+  if (level === "ALERTE") return <Activity size={18} strokeWidth={2.2} />;
+  return <Zap size={18} strokeWidth={2.2} />;
 }
 
 export default function AlertCard({ alert }: { alert: AlerteDashboardDto }) {
   return (
-    <Card className="alert-item">
-      <div className="item-meta">
-        <span className={badgeClass(alert.gravite)}>{alert.gravite}</span>
-        <span className="data-badge">{alert.statut}</span>
+    <div className="v2-alert">
+      <span className={`ai ${alertTone(alert.gravite)}`}>
+        {alertIcon(alert.gravite)}
+      </span>
+      <div className="info">
+        <b>{alert.message || `Alert #${alert.id}`}</b>
+        <span><Cpu size={12} /> {alert.statut}</span>
       </div>
-      <strong>Alert #{alert.id}</strong>
-      <p>{alert.message}</p>
-    </Card>
+      <span className={alertBadge(alert.gravite)}>{alert.gravite}</span>
+    </div>
   );
 }

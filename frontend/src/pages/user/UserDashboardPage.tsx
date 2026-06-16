@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
+  ArrowRight,
   Cpu,
   Gauge,
   ShieldAlert,
@@ -12,35 +13,23 @@ import {
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import AlertCard from "../../components/cards/AlertCard";
 import PredictionCard from "../../components/cards/PredictionCard";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
-import Button from "../../components/common/Button";
 import { useApi } from "../../hooks/useApi";
 import { getDashboardData, getOperationalDashboard } from "../../services/dashboardService";
-
-function getStatusClass(status?: string) {
-  if (status === "NORMAL") return "status-normal";
-  if (status === "ALERTE") return "status-alert";
-  if (status === "CRITIQUE") return "status-critical";
-  return "";
-}
-
-function getBadgeClass(status?: string) {
-  if (status === "CRITIQUE") return "badge-critical";
-  if (status === "ALERTE") return "badge-alert";
-  return "badge-normal";
-}
 
 function formatDate(value?: string) {
   if (!value) return "--";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleString("en-GB", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+    : date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function statusBadge(status?: string) {
+  if (status === "CRITIQUE") return "v2-badge crit";
+  if (status === "ALERTE") return "v2-badge warn";
+  return "v2-badge ok";
 }
 
 export default function UserDashboardPage() {
@@ -55,7 +44,7 @@ export default function UserDashboardPage() {
         }),
       ),
     [],
-    3_000, // Auto-refresh every 3 seconds
+    3_000,
   );
 
   const data = bundle?.data ?? null;
@@ -73,46 +62,9 @@ export default function UserDashboardPage() {
     return "System currently nominal";
   }, [status]);
 
-  const topCards = [
-    {
-      label: "Temperature",
-      value: `${latestMeasure?.temperature ?? "--"} °C`,
-      helper: "Current thermal signal",
-      icon: <Thermometer size={18} strokeWidth={2.2} />,
-      toneClass: "temperature-tone",
-    },
-    {
-      label: "Current",
-      value: `${latestMeasure?.courant ?? "--"} A`,
-      helper: "Current electrical usage",
-      icon: <Zap size={18} strokeWidth={2.2} />,
-      toneClass: "current-tone",
-    },
-    {
-      label: "Vibration",
-      value: `${latestMeasure?.vibration ?? "--"}`,
-      helper: "Mechanical intensity",
-      icon: <Activity size={18} strokeWidth={2.2} />,
-      toneClass: "vibration-tone",
-    },
-    {
-      label: "Motor status",
-      value: status,
-      helper,
-      icon: <ShieldAlert size={18} strokeWidth={2.2} />,
-      toneClass:
-        status === "CRITIQUE"
-          ? "critical-tone"
-          : status === "ALERTE"
-          ? "warning-tone"
-          : "normal-tone",
-      statusClass: getStatusClass(status),
-    },
-  ];
-
   if (loading) {
     return (
-      <DashboardLayout title="User Dashboard" subtitle="Loading..." roleLabel="Operator">
+      <DashboardLayout title="Dashboard" subtitle="Loading..." roleLabel="Operator">
         <Loader />
       </DashboardLayout>
     );
@@ -120,7 +72,7 @@ export default function UserDashboardPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="User Dashboard" subtitle="Unable to load" roleLabel="Operator">
+      <DashboardLayout title="Dashboard" subtitle="Unable to load" roleLabel="Operator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
@@ -128,162 +80,128 @@ export default function UserDashboardPage() {
 
   return (
     <DashboardLayout
-      title="User Dashboard"
+      title="Dashboard"
       subtitle="Simplified visibility on live measures, alerts and prediction output."
       roleLabel="Operator"
     >
-      {/* TOP KPI CARDS */}
-      <div className="user-kpi-grid">
-        {topCards.map((card) => (
-          <Card key={card.label} className="info-card compact-kpi-card">
-            <div className="compact-kpi-header">
-              <div className={`compact-kpi-icon ${card.toneClass}`}>{card.icon}</div>
-              <span className="compact-kpi-label">{card.label}</span>
-            </div>
-
-            <div className={`compact-kpi-value ${card.statusClass ?? ""}`}>
-              {card.value}
-            </div>
-
-            <div className="compact-kpi-helper">{card.helper}</div>
-          </Card>
-        ))}
+      {/* KPI strip */}
+      <div className="v2-kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+        <div className="v2-kpi">
+          <span className="ic t-temp"><Thermometer size={18} strokeWidth={2.2} /></span>
+          <div className="label">Temperature</div>
+          <div className="value">{latestMeasure?.temperature ?? "--"}<small> °C</small></div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-cur"><Zap size={18} strokeWidth={2.2} /></span>
+          <div className="label">Current</div>
+          <div className="value">{latestMeasure?.courant ?? "--"}<small> A</small></div>
+        </div>
+        <div className="v2-kpi">
+          <span className="ic t-vib"><Activity size={18} strokeWidth={2.2} /></span>
+          <div className="label">Vibration</div>
+          <div className="value">{latestMeasure?.vibration ?? "--"}</div>
+        </div>
+        <div className="v2-kpi">
+          <span className={`ic ${status === "CRITIQUE" ? "t-crit" : status === "ALERTE" ? "t-warn" : "t-ok"}`}>
+            <ShieldAlert size={18} strokeWidth={2.2} />
+          </span>
+          <div className="label">Motor status</div>
+          <div className="value" style={{ fontSize: "1.1rem" }}>{status}</div>
+          <div style={{ fontSize: ".76rem", color: "var(--muted)" }}>{helper}</div>
+        </div>
       </div>
 
-      {/* MAIN CONTENT */}
-      <div className="dashboard-grid" style={{ marginTop: "1.2rem" }}>
-        {/* LEFT COLUMN */}
-        <div className="stack">
-          <Card className="info-card" id="live-status">
-            <div className="card-title-row">
-              <h3>Current machine snapshot</h3>
-              <span className={`data-badge ${getBadgeClass(status)}`}>{status}</span>
-            </div>
+      {/* Main grid */}
+      <div className="v2-grid-2">
+        {/* Left — Machine snapshot */}
+        <div className="v2-card v2-card-pad">
+          <div className="v2-card-head" style={{ alignItems: "center" }}>
+            <h3>Current machine snapshot</h3>
+            <span className={statusBadge(status)}>{status}</span>
+          </div>
 
-            <div className="user-machine-header">
-              <div className="user-machine-icon">
-                <Cpu size={20} strokeWidth={2.2} />
-              </div>
-
-              <div>
-                <div className="user-machine-label">Machine</div>
-                <h3 className="user-machine-title">
-                  {latestMeasure?.nomMachine ?? "--"}
-                </h3>
-                <p className="user-machine-date">
-                  Timestamp: {formatDate(latestMeasure?.horodatage)}
-                </p>
+          <div className="v2-asset-head" style={{ marginTop: 12 }}>
+            <span className="ic t-green"><Cpu size={20} strokeWidth={2.2} /></span>
+            <div>
+              <div className="v2-asset-id">{latestMeasure?.nomMachine ?? "--"}</div>
+              <div style={{ fontSize: ".82rem", color: "var(--muted)" }}>
+                Timestamp: {formatDate(latestMeasure?.horodatage)}
               </div>
             </div>
+          </div>
 
-            <div className="user-snapshot-grid">
-              <div className="user-snapshot-tile">
-                <div className="user-snapshot-tile-top">
-                  <div className="user-snapshot-icon rpm-tone">
-                    <Gauge size={18} strokeWidth={2.2} />
-                  </div>
-                  <span>RPM</span>
-                </div>
-                <strong>{latestMeasure?.rpm ?? "--"}</strong>
-              </div>
-
-              <div className="user-snapshot-tile">
-                <div className="user-snapshot-tile-top">
-                  <div className="user-snapshot-icon prediction-tone">
-                    <TrendingUp size={18} strokeWidth={2.2} />
-                  </div>
-                  <span>Predicted RUL</span>
-                </div>
-                <strong>{latestRul?.rulDays != null ? `${String(latestRul.rulDays)} d` : "--"}</strong>
-              </div>
-
-              <div className="user-snapshot-tile">
-                <div className="user-snapshot-tile-top">
-                  <div className="user-snapshot-icon normal-tone">
-                    <ShieldAlert size={18} strokeWidth={2.2} />
-                  </div>
-                  <span>Predicted status</span>
-                </div>
-                <strong>{primaryPrediction?.statutPredit ?? "--"}</strong>
-              </div>
-
-              <div className="user-snapshot-tile">
-                <div className="user-snapshot-tile-top">
-                  <div className="user-snapshot-icon warning-tone">
-                    <Activity size={18} strokeWidth={2.2} />
-                  </div>
-                  <span>Risk level</span>
-                </div>
-                <strong>{primaryPrediction?.niveauRisque ?? "--"}</strong>
-              </div>
+          <div className="v2-signals" style={{ marginTop: 16 }}>
+            <div className="v2-signal">
+              <div className="st"><span className="si t-vib"><Gauge size={16} strokeWidth={2.2} /></span><span className="sl">RPM</span></div>
+              <div className="sv">{latestMeasure?.rpm ?? "--"}</div>
             </div>
-
-            <div className="footer-actions" style={{ marginTop: "1rem" }}>
-              <Button variant="secondary" onClick={() => navigate("/user/history")}>
-                Open history
-              </Button>
-              <Button variant="secondary" onClick={() => navigate("/user/motors")}>
-                View motors
-              </Button>
+            <div className="v2-signal">
+              <div className="st"><span className="si t-purple"><TrendingUp size={16} strokeWidth={2.2} /></span><span className="sl">Predicted RUL</span></div>
+              <div className="sv">{latestRul?.rulDays != null ? `${latestRul.rulDays} d` : "--"}</div>
             </div>
-          </Card>
+            <div className="v2-signal">
+              <div className="st"><span className="si t-ok"><ShieldAlert size={16} strokeWidth={2.2} /></span><span className="sl">Predicted status</span></div>
+              <div className="sv">{primaryPrediction?.statutPredit ?? "--"}</div>
+            </div>
+            <div className="v2-signal">
+              <div className="st"><span className="si t-warn"><ShieldAlert size={16} strokeWidth={2.2} /></span><span className="sl">Risk level</span></div>
+              <div className="sv">{primaryPrediction?.niveauRisque ?? "--"}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+            <button type="button" className="v2-btn v2-btn-soft v2-btn-sm" onClick={() => navigate("/user/history")}>
+              Open history <ArrowRight size={14} />
+            </button>
+            <button type="button" className="v2-btn v2-btn-soft v2-btn-sm" onClick={() => navigate("/user/motors")}>
+              View motors <ArrowRight size={14} />
+            </button>
+          </div>
         </div>
 
-        {/* RIGHT COLUMN */}
-        <div className="stack">
-          <Card className="info-card" id="alerts">
-            <div className="card-title-row">
+        {/* Right — Alerts + Prediction */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="v2-card v2-card-pad">
+            <div className="v2-card-head" style={{ alignItems: "center" }}>
               <h3>Recent alerts</h3>
-              <button
-                type="button"
-                className="card-action-link card-link-button"
-                onClick={() => navigate("/user/alerts")}
-              >
-                View all
-              </button>
+              <button type="button" className="v2-link-btn" onClick={() => navigate("/user/alerts")}>View all</button>
             </div>
-
-            <div className="list-stack">
+            <div className="v2-rows">
               {recentAlerts.length ? (
                 recentAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
               ) : (
-                <div className="centered-empty">No recent alerts.</div>
+                <div className="v2-empty">No recent alerts.</div>
               )}
             </div>
-          </Card>
+          </div>
 
-          <Card className="info-card" id="prediction">
-            <div className="card-title-row">
+          <div className="v2-card v2-card-pad">
+            <div className="v2-card-head" style={{ alignItems: "center" }}>
               <h3>Latest prediction</h3>
-              <button
-                type="button"
-                className="card-action-link card-link-button"
-                onClick={() => navigate("/user/predictions")}
-              >
-                View all
-              </button>
+              <button type="button" className="v2-link-btn" onClick={() => navigate("/user/predictions")}>View all</button>
             </div>
-
-            <div className="list-stack">
+            <div className="v2-rows">
               {primaryPrediction ? (
                 <PredictionCard prediction={primaryPrediction} />
               ) : (
-                <div className="centered-empty">No prediction available.</div>
+                <div className="v2-empty">No prediction available.</div>
               )}
             </div>
-          </Card>
+          </div>
 
-          <Card className="info-card">
-            <div className="card-title-row">
+          <div className="v2-card v2-card-pad">
+            <div className="v2-card-head" style={{ alignItems: "center" }}>
               <h3>Prediction reason</h3>
-              <span className="data-badge">{latestRul?.simulated ? "Simulated RUL" : "Model RUL"}</span>
+              <span className="v2-badge neutral">{latestRul?.simulated ? "Simulated RUL" : "Model RUL"}</span>
             </div>
             {latestExplanation ? (
-              <p>{String(latestExplanation.explanation ?? "No explanation available.")}</p>
+              <p style={{ fontSize: ".88rem", color: "var(--muted)", margin: "8px 0 0" }}>
+                {String(latestExplanation.explanation ?? "No explanation available.")}
+              </p>
             ) : (
-              <div className="centered-empty">No explanation available.</div>
+              <div className="v2-empty">No explanation available.</div>
             )}
-          </Card>
+          </div>
         </div>
       </div>
     </DashboardLayout>

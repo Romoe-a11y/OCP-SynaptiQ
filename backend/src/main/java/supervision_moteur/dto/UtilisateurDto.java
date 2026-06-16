@@ -25,4 +25,6 @@ public class UtilisateurDto {
     private String notificationWebhook;
     private Boolean active;
     private String temporaryPassword;
+    private Boolean emailDeliverySuccessful;
+    private String emailDeliveryMessage;
 }

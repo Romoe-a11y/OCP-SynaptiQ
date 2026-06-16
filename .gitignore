@@ -11,14 +11,12 @@ frontend/dist/
 frontend/.vite/
 frontend/tsconfig.tsbuildinfo
 frontend/vite.config.ts.timestamp-*.mjs
-frontend/*.log
 
 # Backend build/IDE output
 backend/target/
 backend/.idea/
 backend/*.iml
-backend/*.log
-backend/*.pid
+backend/data/
 
 # AI generated or heavy artifacts
 ai/data/
@@ -31,15 +29,26 @@ ai/mlruns/
 
 # Local environment files
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
-# Local archives/generated review assets
+# Keep frontend env files (no secrets, just API URLs)
+!frontend/.env.development
+!frontend/.env.production
+
+# Keep example env files
+!*.env.example
+!backend/.env.railway.example
+
+# Local archives and generated review assets
 archive/
 pdf_review_pages/
 trash/
+/output/
+/outputs/
+/tmp/
 
-# OS/editor files
+# OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/
@@ -48,3 +57,7 @@ Thumbs.db
 *.tmp
 ~$*
 **/.fuse_hidden*
+
+# Claude Code
+.claude/
+.remember/

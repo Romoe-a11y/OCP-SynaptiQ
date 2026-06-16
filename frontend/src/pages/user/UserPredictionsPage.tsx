@@ -1,5 +1,4 @@
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import Card from "../../components/common/Card";
 import Loader from "../../components/common/Loader";
 import ApiError from "../../components/common/ApiError";
 import PredictionCard from "../../components/cards/PredictionCard";
@@ -11,7 +10,7 @@ export default function UserPredictionsPage() {
 
   if (loading) {
     return (
-      <DashboardLayout title="User Predictions" subtitle="Loading..." roleLabel="Operator">
+      <DashboardLayout title="Predictions" subtitle="Loading..." roleLabel="Operator">
         <Loader />
       </DashboardLayout>
     );
@@ -19,7 +18,7 @@ export default function UserPredictionsPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="User Predictions" subtitle="Unable to load" roleLabel="Operator">
+      <DashboardLayout title="Predictions" subtitle="Unable to load" roleLabel="Operator">
         <ApiError message={error} onRetry={reload} />
       </DashboardLayout>
     );
@@ -28,13 +27,31 @@ export default function UserPredictionsPage() {
   const predictions = items ?? [];
 
   return (
-    <DashboardLayout title="User Predictions" subtitle="Prediction visibility and risk level in the operational user space." roleLabel="Operator">
-      <Card className="info-card">
-        <div className="card-title-row"><h3>Prediction summary</h3></div>
-        <div className="list-stack">
-          {predictions.length ? predictions.map((prediction) => <PredictionCard key={prediction.id} prediction={{ id: prediction.id, statutPredit: prediction.statutPredit ?? "N/A", niveauRisque: prediction.niveauRisque ?? "INFO", confiance: prediction.confiance ?? 0, dateCreation: prediction.dateCreation ?? "" }} />) : <div className="centered-empty">No predictions available.</div>}
+    <DashboardLayout title="Predictions" subtitle="Prediction visibility and risk level in the operational user space." roleLabel="Operator">
+      <div className="v2-card v2-card-pad">
+        <div className="v2-card-head" style={{ alignItems: "center" }}>
+          <h3>Prediction summary</h3>
+          <span className="v2-badge neutral">{predictions.length} records</span>
         </div>
-      </Card>
+        <div className="v2-rows">
+          {predictions.length ? (
+            predictions.map((prediction) => (
+              <PredictionCard
+                key={prediction.id}
+                prediction={{
+                  id: prediction.id,
+                  statutPredit: prediction.statutPredit ?? "N/A",
+                  niveauRisque: prediction.niveauRisque ?? "INFO",
+                  confiance: prediction.confiance ?? 0,
+                  dateCreation: prediction.dateCreation ?? "",
+                }}
+              />
+            ))
+          ) : (
+            <div className="v2-empty">No predictions available.</div>
+          )}
+        </div>
+      </div>
     </DashboardLayout>
   );
 }

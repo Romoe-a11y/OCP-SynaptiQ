@@ -16,6 +16,7 @@ import supervision_moteur.dto.UtilisateurUpdateRequest;
 import supervision_moteur.entity.Utilisateur;
 import supervision_moteur.enums.RoleUtilisateur;
 import supervision_moteur.repository.UtilisateurRepository;
+import supervision_moteur.service.EmailService;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -39,6 +40,7 @@ public class UtilisateurController {
     private final UtilisateurRepository utilisateurRepository;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final EmailService emailService;
 
     @GetMapping
     public List<UtilisateurDto> getAllUtilisateurs() {
@@ -88,6 +90,11 @@ public class UtilisateurController {
         Utilisateur saved = utilisateurRepository.save(utilisateur);
         UtilisateurDto response = toDto(saved);
         response.setTemporaryPassword(generatedPassword ? rawPassword : null);
+        if (Boolean.TRUE.equals(saved.getNotificationEmail())) {
+            EmailService.DeliveryResult deliveryResult =
+                    emailService.sendUserInvite(saved.getEmail(), saved.getNomComplet(), rawPassword, saved.getRole().name());
+            applyEmailDeliveryResult(response, deliveryResult);
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -166,6 +173,15 @@ public class UtilisateurController {
 
         UtilisateurDto response = findDtoById(id);
         response.setTemporaryPassword(temporaryPassword);
+        if (Boolean.TRUE.equals(response.getNotificationEmail())) {
+            EmailService.DeliveryResult deliveryResult = emailService.sendPasswordReset(
+                    response.getEmail(),
+                    response.getNomComplet(),
+                    temporaryPassword,
+                    response.getRole().name()
+            );
+            applyEmailDeliveryResult(response, deliveryResult);
+        }
         return ResponseEntity.ok(response);
     }
 
@@ -213,6 +229,8 @@ public class UtilisateurController {
                 u.getNotificationEmail(),
                 u.getNotificationWebhook(),
                 active,
+                null,
+                null,
                 null
         );
     }
@@ -263,8 +281,15 @@ public class UtilisateurController {
                 getNullableBoolean(rs, "notification_email"),
                 rs.getString("notification_webhook"),
                 active,
+                null,
+                null,
                 null
         );
+    }
+
+    private void applyEmailDeliveryResult(UtilisateurDto response, EmailService.DeliveryResult deliveryResult) {
+        response.setEmailDeliverySuccessful(deliveryResult.successful());
+        response.setEmailDeliveryMessage(deliveryResult.message());
     }
 
     private RoleUtilisateur parseRole(String role) {
