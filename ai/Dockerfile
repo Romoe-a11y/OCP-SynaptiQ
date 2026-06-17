@@ -41,7 +41,8 @@ ENV AI_API_HOST=0.0.0.0 \
 EXPOSE 5001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-5001}/health')"
 
 # Production server: gunicorn with Flask app
-ENTRYPOINT ["gunicorn", "app.app:app", "--bind", "0.0.0.0:5001", "--workers", "2", "--timeout", "120"]
+# Railway sets $PORT automatically; fall back to 5001 for local dev
+CMD gunicorn app.app:app --bind "0.0.0.0:${PORT:-5001}" --workers 2 --timeout 120
