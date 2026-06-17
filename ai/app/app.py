@@ -27,12 +27,28 @@ setup_logging(level="INFO")
 logger = get_logger("flask")
 
 app = Flask(__name__)
-model_artifact = load_model_artifact(MODEL_FILE)
-rul_model_artifact = load_rul_model_artifact(RUL_MODEL_FILE)
+
+# Gracefully handle missing model files (they are gitignored binary artifacts).
+# The Spring Boot backend has its own fallback predictions when AI returns errors.
+try:
+    model_artifact = load_model_artifact(MODEL_FILE)
+    logger.info("Diagnostic model loaded successfully")
+except FileNotFoundError:
+    logger.warning("Diagnostic model not found at %s — running without predictions", MODEL_FILE)
+    model_artifact = None
+
+try:
+    rul_model_artifact = load_rul_model_artifact(RUL_MODEL_FILE)
+    logger.info("RUL model loaded successfully")
+except FileNotFoundError:
+    logger.warning("RUL model not found at %s — running without RUL predictions", RUL_MODEL_FILE)
+    rul_model_artifact = None
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    if model_artifact is None:
+        return jsonify({"error": "Model not loaded — train models first"}), 503
     try:
         data = request.get_json()
         is_valid, error_message = validate_payload(data)
@@ -51,6 +67,8 @@ def predict():
 
 @app.route("/predict-rul", methods=["POST"])
 def predict_remaining_useful_life():
+    if rul_model_artifact is None:
+        return jsonify({"error": "RUL model not loaded — train models first"}), 503
     try:
         data = request.get_json()
         is_valid, error_message = validate_payload(data)
@@ -69,17 +87,23 @@ def predict_remaining_useful_life():
 
 @app.route("/health", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy", "model_version": model_artifact.get("version")}), 200
+    models_loaded = model_artifact is not None and rul_model_artifact is not None
+    return jsonify({
+        "status": "healthy",
+        "models_loaded": models_loaded,
+        "model_version": model_artifact.get("version") if model_artifact else None,
+    }), 200
 
 
 @app.route("/", methods=["GET"])
 def home():
-    moment_config = model_artifact.get("moment_anomaly_model") or {}
+    moment_config = (model_artifact or {}).get("moment_anomaly_model") or {}
     return jsonify({
         "service": "Predictive Maintenance API (Flask)",
-        "model_version": model_artifact.get("version", 1),
-        "rul_simulated": rul_model_artifact.get("simulated", True),
+        "model_version": (model_artifact or {}).get("version", 1),
+        "rul_simulated": (rul_model_artifact or {}).get("simulated", True),
         "moment_enabled": bool(moment_config),
+        "models_loaded": model_artifact is not None,
     })
 
 
