@@ -3,6 +3,7 @@ package supervision_moteur.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import supervision_moteur.entity.Mesure;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MesureRepository extends JpaRepository<Mesure, Long> {
+
+    @Query("SELECT m.id FROM Mesure m ORDER BY m.id")
+    List<Long> findAllIdsSorted();
 
     // ── Paginated queries ──
     Page<Mesure> findByMachineIdOrderByHorodatageDesc(Long machineId, Pageable pageable);
